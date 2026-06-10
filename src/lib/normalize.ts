@@ -6,7 +6,8 @@ export function dedupeKey(company: string, title: string, url: string): string {
   return createHash("sha1").update(`${norm(company)}|${norm(title)}|${norm(url)}`).digest("hex");
 }
 
-const REMOTE_RE = /\bremote\b|\bwork from home\b|\bwfh\b|\bdistributed\b/i;
+// "distributed" alone matches "distributed systems"; require a work-mode noun after it
+const REMOTE_RE = /\bremote\b|\bwork from home\b|\bwfh\b|\bdistributed (team|company|workforce)\b/i;
 const ONSITE_RE = /\bon-?site\b|\bin-?person\b|\bin office\b/i;
 // HN convention: "No remote" / "not remote" flags an onsite-only role
 const NO_REMOTE_RE = /\bno remote\b|\bnot remote\b|\bremote:\s*no\b/i;

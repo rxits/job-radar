@@ -12,7 +12,8 @@ function stripHtml(html: string): string {
 // First line of a Who-is-hiring post is conventionally "Company | Role | Location | ...".
 function parsePost(text: string): { company: string; title: string; location: string | null } {
   const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
-  const parts = firstLine.split(/\s*[|•·–—-]\s*/).filter(Boolean);
+  // dashes only split when space-padded, so "150-250k" / "e-commerce" stay intact
+  const parts = firstLine.split(/\s*[|•·]\s*|\s+[–—-]\s+/).filter(Boolean);
   const company = parts[0]?.slice(0, 120) || "Unknown";
   const title = parts[1]?.slice(0, 160) || firstLine.slice(0, 160) || "Role";
   const location = parts.slice(2).join(" | ").slice(0, 120) || null;
