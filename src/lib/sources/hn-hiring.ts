@@ -1,13 +1,5 @@
 import type { JobSource, RawJob } from "../types";
-import { looksRemote, safeDateISO } from "../normalize";
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<p>/gi, "\n").replace(/<[^>]+>/g, "")
-    .replace(/&#x2F;/g, "/").replace(/&gt;/g, ">").replace(/&lt;/g, "<")
-    .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .trim();
-}
+import { looksRemote, safeDateISO, stripHtml } from "../normalize";
 
 // First line of a Who-is-hiring post is conventionally "Company | Role | Location | ...".
 function parsePost(text: string): { company: string; title: string; location: string | null } {

@@ -28,3 +28,23 @@ export function safeDateISO(d: unknown): string | null {
 export function normalize(raw: RawJob, source: string): NormalizedJob {
   return { ...raw, source, dedupeKey: dedupeKey(raw.company, raw.title, raw.url) };
 }
+
+// HTML entity + tag stripper — shared by hn-hiring and wwr parsers.
+// Handles both real HTML (hn-hiring) and entity-encoded HTML (wwr RSS descriptions).
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&").replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'").replace(/&#x2F;/g, "/")
+    .replace(/&nbsp;/g, " ");
+}
+
+export function stripHtml(html: string): string {
+  // Decode entities first so entity-encoded HTML tags become real tags, then strip.
+  // Two decode passes handle double-encoded content (&amp;amp; in RSS descriptions).
+  const decoded = decodeEntities(decodeEntities(html));
+  return decoded
+    .replace(/<p\b[^>]*>/gi, "\n").replace(/<br\b[^>]*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+}
