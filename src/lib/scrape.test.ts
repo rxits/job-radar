@@ -9,6 +9,15 @@ const ok: JobSource = { id: "ok", async fetch() {
 }};
 const boom: JobSource = { id: "boom", async fetch() { throw new Error("down"); } };
 
+const geoSource: JobSource = { id: "geo", async fetch() {
+  return [
+    { company: "A", title: "Dev", location: null, remote: true, salary: null,
+      url: "https://x/2", description: "d", postedAt: null, geoRaw: "Worldwide" },
+    { company: "B", title: "SWE", location: null, remote: true, salary: null,
+      url: "https://x/3", description: "d", postedAt: null, geoRaw: "United States" },
+  ];
+}};
+
 describe("runScrape", () => {
   it("stores jobs from healthy sources and isolates failures", async () => {
     const db = createDb(":memory:");
@@ -23,5 +32,24 @@ describe("runScrape", () => {
     await runScrape(db, [ok]);
     await runScrape(db, [ok]);
     expect(db.listJobs({}).length).toBe(1);
+  });
+
+  it("classifies geo at scrape time when profile location is set", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("resume", "skills", "Chandigarh, India", null, null);
+    await runScrape(db, [geoSource]);
+    const jobs = db.listJobs({});
+    const worldwide = jobs.find(j => j.geoRaw === "Worldwide");
+    const usOnly = jobs.find(j => j.geoRaw === "United States");
+    expect(worldwide?.eligibility).toBe("eligible");
+    expect(usOnly?.eligibility).toBe("ineligible");
+  });
+
+  it("leaves eligibility unknown when no profile location", async () => {
+    const db = createDb(":memory:");
+    // no profile saved at all
+    await runScrape(db, [geoSource]);
+    const jobs = db.listJobs({});
+    expect(jobs.every(j => j.eligibility === "unknown")).toBe(true);
   });
 });

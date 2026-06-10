@@ -2,6 +2,7 @@ import type { Db } from "./db";
 import type { JobSource } from "./types";
 import { normalize } from "./normalize";
 import { sources as defaultSources } from "./sources";
+import { classifyGeo } from "./eligibility";
 
 export interface ScrapeReport { source: string; ok: boolean; fetched: number; inserted: number; error?: string; }
 
@@ -16,6 +17,15 @@ export async function runScrape(db: Db, sources: JobSource[] = defaultSources): 
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       reports.push({ source: s.id, ok: false, fetched: 0, inserted: 0, error });
+    }
+  }
+  // Rules pass: classify geo for all unknown-eligibility jobs when we have a candidate location
+  const candidateLocation = db.getProfile()?.location?.trim() ?? "";
+  if (candidateLocation) {
+    for (const j of db.listJobs({ eligibility: ["unknown"] })) {
+      if (!j.geoRaw) continue;
+      const { eligibility, reason } = classifyGeo(j.geoRaw, candidateLocation);
+      if (eligibility !== "unknown") db.setEligibility(j.id, eligibility, reason);
     }
   }
   return reports;

@@ -132,3 +132,60 @@ describe("deepMatch", () => {
     expect(dm.gaps).toContain("k8s");
   });
 });
+
+describe("matchNew v2 (eligibility + aiFriendly)", () => {
+  it("persists aiFriendly and sets eligibility from stub output", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("react dev", "react", "Chandigarh, India", "IST", null);
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    const stub: GeminiClient = {
+      async generateJSON() {
+        return JSON.stringify([{ id, score: 80, reason: "good fit", eligible: "yes", eligibilityReason: "open worldwide", aiFriendly: 75 }]);
+      },
+    };
+    await matchNew(db, stub);
+    const row = db.listJobs({})[0];
+    expect(row.aiFriendly).toBe(75);
+    expect(row.eligibility).toBe("eligible");
+    expect(row.eligibilityReason).toBeTruthy();
+  });
+
+  it("does not overwrite a pre-set ineligible verdict even when eligible:yes returned", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("react dev", "react", "Chandigarh, India", "IST", null);
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.setEligibility(id, "ineligible", "US only");
+    const stub: GeminiClient = {
+      async generateJSON() {
+        return JSON.stringify([{ id, score: 80, reason: "good fit", eligible: "yes", eligibilityReason: "open worldwide", aiFriendly: 60 }]);
+      },
+    };
+    await matchNew(db, stub);
+    const row = db.listJobs({})[0];
+    expect(row.eligibility).toBe("ineligible");
+    expect(row.eligibilityReason).toBe("US only");
+  });
+
+  it("stores null aiFriendly when value is missing or garbage, no crash", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("react dev", "react", "Chandigarh, India", "IST", null);
+    db.upsertJobs([job(), job()]);
+    const ids = db.listJobs({}).map(j => j.id);
+    const stub: GeminiClient = {
+      async generateJSON() {
+        return JSON.stringify([
+          { id: ids[0], score: 70, reason: "ok", eligible: "unclear", eligibilityReason: "not sure", aiFriendly: "garbage" },
+          { id: ids[1], score: 65, reason: "ok", eligible: "unclear", eligibilityReason: "not sure" },
+        ]);
+      },
+    };
+    const res = await matchNew(db, stub);
+    expect(res.scored).toBe(2);
+    const rows = db.listJobs({});
+    for (const row of rows) {
+      expect(row.aiFriendly).toBeNull();
+    }
+  });
+});

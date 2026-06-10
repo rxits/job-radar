@@ -24,14 +24,16 @@ export function parseJson<T>(raw: string): T {
   return JSON.parse(cleaned) as T;
 }
 
-function batchPrompt(profile: { resumeText: string; coreSkills: string }, jobs: JobRow[]): string {
+function batchPrompt(profile: { resumeText: string; coreSkills: string; location?: string | null; timezone?: string | null; preferences?: string | null }, jobs: JobRow[]): string {
   const list = jobs.map((j) => ({ id: j.id, title: j.title, company: j.company, description: j.description.slice(0, 1200) }));
   return [
     "You are a job-matching assistant. Score how well each job fits the candidate.",
     `CANDIDATE RESUME:\n${profile.resumeText}`,
     `CORE SKILLS: ${profile.coreSkills}`,
+    `CANDIDATE LOCATION: ${profile.location ?? "unknown"} (timezone ${profile.timezone ?? "unknown"})`,
+    `CANDIDATE PREFERENCES: ${profile.preferences ?? "none stated"}`,
     `JOBS (JSON): ${JSON.stringify(list)}`,
-    'Return ONLY a JSON array: [{"id": string, "score": number 0-100, "reason": string (max 15 words)}]. One object per job id.',
+    'Return ONLY a JSON array: [{"id": string, "score": number 0-100, "reason": string (max 15 words), "eligible": "yes"|"no"|"unclear" (can the candidate, living at the location above, legally/practically be hired for this job based on its text?), "eligibilityReason": string (max 12 words), "aiFriendly": number 0-100 (evidence the company embraces AI/modern tooling: AI products, LLM stack, AI-assisted dev culture)}]. One object per job id.',
   ].join("\n\n");
 }
 
@@ -65,7 +67,19 @@ export async function matchNew(
           if (!r || typeof r.id !== "string") continue;
           if (!batchIds.has(r.id)) continue;
           const score = Math.max(0, Math.min(100, Math.round(r.score)));
-          db.saveMatch(r.id, score, String(r.reason ?? "").slice(0, 200), FLASH);
+          const aiFriendlyRaw = Number(r.aiFriendly);
+          const aiFriendly = Number.isFinite(aiFriendlyRaw) ? Math.max(0, Math.min(100, Math.round(aiFriendlyRaw))) : null;
+          db.saveMatch(r.id, score, String(r.reason ?? "").slice(0, 200), FLASH, aiFriendly);
+          // Update eligibility only if the job's current verdict is still unknown
+          const batchJob = batch.find((b) => b.id === r.id);
+          if (batchJob && batchJob.eligibility === "unknown") {
+            if (r.eligible === "yes") {
+              db.setEligibility(r.id, "eligible", String(r.eligibilityReason ?? "").slice(0, 120));
+            } else if (r.eligible === "no") {
+              db.setEligibility(r.id, "ineligible", String(r.eligibilityReason ?? "").slice(0, 120));
+            }
+            // "unclear" → leave unknown
+          }
           scored++;
         }
         batchScored = true;
