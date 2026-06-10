@@ -17,6 +17,13 @@ export function looksRemote(text: string): boolean {
   return REMOTE_RE.test(text);
 }
 
+// Sources pass through API-provided dates; a single bad value must not crash a whole scrape.
+export function safeDateISO(d: unknown): string | null {
+  if (!d) return null;
+  const t = new Date(d as string | number);
+  return Number.isNaN(t.getTime()) ? null : t.toISOString();
+}
+
 export function normalize(raw: RawJob, source: string): NormalizedJob {
   return { ...raw, source, dedupeKey: dedupeKey(raw.company, raw.title, raw.url) };
 }

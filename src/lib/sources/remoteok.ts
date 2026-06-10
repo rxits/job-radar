@@ -1,4 +1,5 @@
 import type { JobSource, RawJob } from "../types";
+import { safeDateISO } from "../normalize";
 
 export function parseRemoteOK(rows: any[]): RawJob[] {
   return rows
@@ -6,7 +7,7 @@ export function parseRemoteOK(rows: any[]): RawJob[] {
     .map((r): RawJob => {
       // salary_min/salary_max are 0 (not null) when unset
       const salary =
-        r.salary_min && r.salary_max && r.salary_min > 0
+        r.salary_min > 0 && r.salary_max > 0
           ? `$${r.salary_min}–$${r.salary_max}`
           : null;
       // location often has a trailing ", " — trim it
@@ -21,7 +22,7 @@ export function parseRemoteOK(rows: any[]): RawJob[] {
         url: String(r.url ?? `https://remoteok.com/remote-jobs/${r.id}`),
         // description is HTML; slice to 4000 chars
         description: String(r.description ?? (r.tags ? (r.tags as string[]).join(", ") : "")).slice(0, 4000),
-        postedAt: r.date ? new Date(r.date).toISOString() : null,
+        postedAt: safeDateISO(r.date),
       };
     });
 }
