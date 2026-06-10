@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function Analytics() {
   const jobs = db().listJobs({});
+  const activity = db().recentActivity(20);
   const byStatus = STATUSES.map((s) => ({ s, n: jobs.filter((j) => j.status === s).length }));
   const bySource = [...new Set(jobs.map((j) => j.source))].map((src) => ({ src, n: jobs.filter((j) => j.source === src).length }));
   const scored = jobs.filter((j) => j.score != null);
@@ -28,6 +29,18 @@ export default function Analytics() {
         {bySource.map((b) => <Bar key={b.src} label={b.src} n={b.n} max={total} />)}</section>
       <section><h2 className="mb-2 text-sm uppercase text-neutral-500">Match score ({scored.length} scored)</h2>
         {buckets.map((b) => <Bar key={b.lo} label={b.lo === 80 ? "80–100" : `${b.lo}–${b.lo + 19}`} n={b.n} max={scored.length} />)}</section>
+      <section><h2 className="mb-2 text-sm uppercase text-neutral-500">Recent activity</h2>
+        {activity.length === 0 && <p className="text-sm text-neutral-600">No status changes yet.</p>}
+        <ul className="space-y-1 text-sm">
+          {activity.map((a, i) => (
+            <li key={i} className="flex gap-2 text-neutral-300">
+              <span className="w-36 shrink-0 text-neutral-500">{new Date(a.changedAt).toLocaleString()}</span>
+              <span className="truncate">{a.company} — {a.title}</span>
+              <span className="shrink-0 text-neutral-500">{a.from} → {a.to}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

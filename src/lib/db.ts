@@ -13,6 +13,7 @@ export interface Db {
   setStatus(id: string, status: Status): void;
   saveMatch(id: string, score: number, reason: string, model: string): void;
   statusHistory(): { jobId: string; from: string; to: string; changedAt: string }[];
+  recentActivity(limit?: number): { company: string; title: string; from: string; to: string; changedAt: string }[];
   getProfile(): { resumeText: string; coreSkills: string } | null;
   saveProfile(resumeText: string, coreSkills: string): void;
   raw: Database.Database;
@@ -109,6 +110,13 @@ export function createDb(path = "data/jobradar.db"): Db {
     },
     statusHistory() {
       return raw.prepare("SELECT job_id as jobId, from_status as 'from', to_status as 'to', changed_at as changedAt FROM status_history ORDER BY changed_at").all() as any;
+    },
+    recentActivity(limit = 20) {
+      return raw.prepare(
+        `SELECT j.company, j.title, h.from_status as 'from', h.to_status as 'to', h.changed_at as changedAt
+         FROM status_history h JOIN jobs j ON j.id = h.job_id
+         ORDER BY h.changed_at DESC, h.id DESC LIMIT ?`
+      ).all(limit) as any;
     },
     getProfile() {
       const r = raw.prepare("SELECT resume_text as resumeText, core_skills as coreSkills FROM profile WHERE id = 1").get() as any;

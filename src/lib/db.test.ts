@@ -75,4 +75,39 @@ describe("db", () => {
     db.saveProfile("resume text", "ts, react");
     expect(db.getProfile()).toEqual({ resumeText: "resume text", coreSkills: "ts, react" });
   });
+
+  it("recentActivity returns rows newest-first with company/title/from/to", () => {
+    db.upsertJobs([
+      job({ dedupeKey: "ra1", url: "https://x/ra1", company: "Acme", title: "Engineer" }),
+      job({ dedupeKey: "ra2", url: "https://x/ra2", company: "Beta", title: "Designer" }),
+    ]);
+    const [job1, job2] = db.listJobs({}).sort((a, b) =>
+      (a.company < b.company ? -1 : 1)
+    ); // job1=Acme, job2=Beta
+    db.setStatus(job1.id, "applied");
+    db.setStatus(job1.id, "interviewing");
+    db.setStatus(job2.id, "applied");
+
+    const rows = db.recentActivity();
+    expect(rows.length).toBe(3);
+    // newest first: job2 applied is last inserted
+    expect(rows[0].company).toBe("Beta");
+    expect(rows[0].from).toBe("to_apply");
+    expect(rows[0].to).toBe("applied");
+    // all rows have truthy company and title
+    for (const r of rows) {
+      expect(r.company).toBeTruthy();
+      expect(r.title).toBeTruthy();
+      expect(r.from).toBeTruthy();
+      expect(r.to).toBeTruthy();
+    }
+    // second row is job1 interviewing
+    expect(rows[1].company).toBe("Acme");
+    expect(rows[1].from).toBe("applied");
+    expect(rows[1].to).toBe("interviewing");
+    // third row is job1 applied
+    expect(rows[2].company).toBe("Acme");
+    expect(rows[2].from).toBe("to_apply");
+    expect(rows[2].to).toBe("applied");
+  });
 });
