@@ -17,6 +17,12 @@ describe("normalize", () => {
     expect(looksRemote("Onsite in NYC")).toBe(false);
   });
 
+  it("treats negated remote as not remote", () => {
+    expect(looksRemote("Great role. No remote, must be in NYC")).toBe(false);
+    expect(looksRemote("ONSITE | REMOTE: no")).toBe(false);
+    expect(looksRemote("Remote OK or onsite in Berlin")).toBe(true);
+  });
+
   it("normalizes a raw job and attaches source + key", () => {
     const n = normalize(
       { company: "Acme", title: "Eng", location: null, remote: true, salary: null,
