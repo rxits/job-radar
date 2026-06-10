@@ -16,6 +16,7 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [minScore, setMinScore] = useState(0);
   const [query, setQuery] = useState("");
+  const [eligFilter, setEligFilter] = useState("eligible,unknown");
   const [reports, setReports] = useState<ScrapeReport[] | null>(null);
   const [deep, setDeep] = useState<{ jobId: string; loading: boolean; data?: DeepMatch; error?: string } | null>(null);
 
@@ -76,7 +77,8 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
   const visible = jobs.filter((j) =>
     (!source || j.source === source) && (!remoteOnly || j.remote) &&
     (minScore === 0 || (j.score ?? -1) >= minScore) &&
-    (!query || (j.company + " " + j.title + " " + j.description).toLowerCase().includes(query.toLowerCase())));
+    (!query || (j.company + " " + j.title + " " + j.description).toLowerCase().includes(query.toLowerCase())) &&
+    (!eligFilter || eligFilter.split(",").includes(j.eligibility)));
 
   return (
     <div className="space-y-4">
@@ -96,6 +98,12 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
           <input type="range" min={0} max={100} value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /> {minScore}
         </label>
         <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm" />
+        <select value={eligFilter} onChange={(e) => setEligFilter(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm">
+          <option value="eligible,unknown">Eligible + Unknown</option>
+          <option value="eligible">Eligible only</option>
+          <option value="">All</option>
+          <option value="ineligible">Ineligible</option>
+        </select>
         <span className="text-sm text-neutral-400">{visible.length} jobs</span>
       </div>
 
@@ -118,7 +126,21 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
                 <div key={j.id} className="rounded border border-neutral-800 bg-neutral-950 p-2 text-xs">
                   <div className="flex items-start justify-between gap-1">
                     <a href={j.url} target="_blank" rel="noreferrer" className="font-medium hover:underline">{j.company}</a>
-                    {j.score != null && <span className="shrink-0 rounded bg-indigo-900 px-1 text-indigo-200">{j.score}</span>}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {j.score != null && <span className="rounded bg-indigo-900 px-1 text-indigo-200">{j.score}</span>}
+                      {j.eligibility === "eligible" && (
+                        <span className="shrink-0 rounded bg-emerald-900 px-1 text-emerald-200" title={j.eligibilityReason ?? "eligible"}>✓</span>
+                      )}
+                      {j.eligibility === "ineligible" && (
+                        <span className="shrink-0 rounded bg-red-900 px-1 text-red-200" title={j.eligibilityReason ?? "ineligible"}>✗</span>
+                      )}
+                      {j.eligibility === "unknown" && (
+                        <span className="shrink-0 rounded bg-neutral-800 px-1 text-neutral-400" title="eligibility unknown">?</span>
+                      )}
+                      {j.aiFriendly != null && j.aiFriendly >= 60 && (
+                        <span className="shrink-0 rounded bg-sky-900 px-1 text-sky-200" title="AI-friendly company signal">AI {j.aiFriendly}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-neutral-300">{j.title}</div>
                   {j.reason && <div className="mt-1 italic text-neutral-500">{j.reason}</div>}
