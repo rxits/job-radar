@@ -34,6 +34,14 @@ describe("db", () => {
     expect(db.statusHistory().length).toBe(1);
   });
 
+  it("setStatus is a silent no-op for same status or unknown id", () => {
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.setStatus(id, "to_apply"); // same as default
+    db.setStatus("no-such-id", "applied");
+    expect(db.statusHistory().length).toBe(0);
+  });
+
   it("saves and joins match scores", () => {
     db.upsertJobs([job()]);
     const id = db.listJobs({})[0].id;

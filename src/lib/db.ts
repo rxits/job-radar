@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   id TEXT PRIMARY KEY, dedupe_key TEXT UNIQUE NOT NULL, source TEXT NOT NULL,
   company TEXT NOT NULL, title TEXT NOT NULL, location TEXT, remote INTEGER NOT NULL,
   salary TEXT, url TEXT NOT NULL, description TEXT NOT NULL, posted_at TEXT,
-  scraped_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'to_apply'
+  scraped_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'to_apply'
+    CHECK (status IN ('to_apply','applied','interviewing','offer','rejected','archived'))
 );
 CREATE TABLE IF NOT EXISTS status_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
