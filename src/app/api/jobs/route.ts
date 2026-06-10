@@ -5,10 +5,12 @@ import { STATUSES } from "@/lib/types";
 
 export async function GET(req: Request) {
   const u = new URL(req.url);
+  const minScoreRaw = u.searchParams.get("minScore");
+  const minScore = minScoreRaw !== null && !Number.isNaN(Number(minScoreRaw)) ? Number(minScoreRaw) : undefined;
   const f = {
     source: u.searchParams.get("source") || undefined,
     remote: u.searchParams.has("remote") ? u.searchParams.get("remote") === "true" : undefined,
-    minScore: u.searchParams.has("minScore") ? Number(u.searchParams.get("minScore")) : undefined,
+    minScore,
     query: u.searchParams.get("query") || undefined,
     status: (u.searchParams.get("status") as Status) || undefined,
   };
