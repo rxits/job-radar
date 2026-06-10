@@ -22,6 +22,8 @@ describe("matchNew", () => {
     };
     const res = await matchNew(db, stub);
     expect(res.scored).toBe(2);
+    expect(res.failedBatches).toBe(0);
+    expect(res.failedJobs).toBe(0);
     expect(db.unscoredJobs().length).toBe(0);
     expect(db.listJobs({})[0].score).toBeGreaterThanOrEqual(80);
   });
@@ -32,6 +34,8 @@ describe("matchNew", () => {
     const stub: GeminiClient = { async generateJSON() { throw new Error("should not call"); } };
     const res = await matchNew(db, stub);
     expect(res.scored).toBe(0);
+    expect(res.failedBatches).toBe(0);
+    expect(res.failedJobs).toBe(0);
   });
 
   it("strips markdown fences and clamps out-of-range scores", async () => {
@@ -53,8 +57,10 @@ describe("matchNew", () => {
     db.saveProfile("dev", "ts");
     db.upsertJobs([job()]);
     const stub: GeminiClient = { async generateJSON() { throw new Error("quota"); } };
-    const res = await matchNew(db, stub);
+    const res = await matchNew(db, stub, { retries: 2, backoffMs: 0 });
     expect(res.scored).toBe(0);
+    expect(res.failedBatches).toBe(1);
+    expect(res.failedJobs).toBe(1);
     expect(db.unscoredJobs().length).toBe(1);
   });
 
@@ -73,6 +79,40 @@ describe("matchNew", () => {
     };
     const res = await matchNew(db, stub);
     expect(res.scored).toBe(1);
+    expect(res.failedBatches).toBe(0);
+    expect(res.failedJobs).toBe(0);
+  });
+
+  it("retries twice then succeeds on third attempt", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("dev", "ts");
+    db.upsertJobs([job(), job()]);
+    const ids = db.listJobs({}).map((j) => j.id);
+    let attempts = 0;
+    const stub: GeminiClient = {
+      async generateJSON() {
+        attempts++;
+        if (attempts < 3) throw new Error("transient error");
+        return JSON.stringify(ids.map((id, i) => ({ id, score: 70 + i, reason: "ok" })));
+      },
+    };
+    const res = await matchNew(db, stub, { retries: 2, backoffMs: 0 });
+    expect(res.scored).toBe(2);
+    expect(res.failedBatches).toBe(0);
+    expect(res.failedJobs).toBe(0);
+    expect(attempts).toBe(3);
+  });
+
+  it("always-failing client reports failedBatches and failedJobs", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("dev", "ts");
+    db.upsertJobs([job(), job(), job()]);
+    const stub: GeminiClient = { async generateJSON() { throw new Error("always fails"); } };
+    const res = await matchNew(db, stub, { retries: 2, backoffMs: 0 });
+    expect(res.scored).toBe(0);
+    expect(res.failedBatches).toBe(1);
+    expect(res.failedJobs).toBe(3);
+    expect(db.unscoredJobs().length).toBe(3);
   });
 });
 

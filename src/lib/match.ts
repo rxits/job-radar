@@ -35,29 +35,51 @@ function batchPrompt(profile: { resumeText: string; coreSkills: string }, jobs: 
   ].join("\n\n");
 }
 
-export async function matchNew(db: Db, client: GeminiClient): Promise<{ scored: number }> {
+export interface MatchNewResult { scored: number; failedBatches: number; failedJobs: number; }
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+export async function matchNew(
+  db: Db,
+  client: GeminiClient,
+  opts?: { retries?: number; backoffMs?: number },
+): Promise<MatchNewResult> {
   const profile = db.getProfile();
-  if (!profile || !profile.resumeText.trim()) return { scored: 0 };
+  if (!profile || !profile.resumeText.trim()) return { scored: 0, failedBatches: 0, failedJobs: 0 };
   const jobs = db.unscoredJobs();
+  const retries = opts?.retries ?? 2;
+  const backoffMs = opts?.backoffMs ?? 2000;
   let scored = 0;
+  let failedBatches = 0;
+  let failedJobs = 0;
   for (let i = 0; i < jobs.length; i += BATCH) {
     const batch = jobs.slice(i, i + BATCH);
     const batchIds = new Set(batch.map((b) => b.id));
-    try {
-      const raw = await client.generateJSON(FLASH, batchPrompt(profile, batch));
-      const results = parseJson<MatchResult[]>(raw);
-      for (const r of results) {
-        if (!r || typeof r.id !== "string") continue;
-        if (!batchIds.has(r.id)) continue;
-        const score = Math.max(0, Math.min(100, Math.round(r.score)));
-        db.saveMatch(r.id, score, String(r.reason ?? "").slice(0, 200), FLASH);
-        scored++;
+    let batchScored = false;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (attempt > 0) await sleep(backoffMs * attempt);
+      try {
+        const raw = await client.generateJSON(FLASH, batchPrompt(profile, batch));
+        const results = parseJson<MatchResult[]>(raw);
+        for (const r of results) {
+          if (!r || typeof r.id !== "string") continue;
+          if (!batchIds.has(r.id)) continue;
+          const score = Math.max(0, Math.min(100, Math.round(r.score)));
+          db.saveMatch(r.id, score, String(r.reason ?? "").slice(0, 200), FLASH);
+          scored++;
+        }
+        batchScored = true;
+        break;
+      } catch {
+        // retry on next iteration if attempts remain
       }
-    } catch {
-      // batch failed (quota/parse) — leave these jobs unscored, continue
+    }
+    if (!batchScored) {
+      failedBatches++;
+      failedJobs += batch.length;
     }
   }
-  return { scored };
+  return { scored, failedBatches, failedJobs };
 }
 
 export async function deepMatch(db: Db, client: GeminiClient, jobId: string): Promise<DeepMatch> {

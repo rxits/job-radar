@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { JobRow, Status } from "@/lib/types";
 import { STATUSES } from "@/lib/types";
+import type { ScrapeReport } from "@/lib/scrape";
 
 const LABEL: Record<Status, string> = {
   to_apply: "To Apply", applied: "Applied", interviewing: "Interviewing",
@@ -15,19 +16,40 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [minScore, setMinScore] = useState(0);
   const [query, setQuery] = useState("");
+  const [reports, setReports] = useState<ScrapeReport[] | null>(null);
 
   async function refresh() {
     const r = await fetch("/api/jobs").then((r) => r.json());
     setJobs(r.jobs);
   }
-  async function scrape() { setBusy("scrape"); try { await fetch("/api/scrape", { method: "POST" }); await refresh(); } finally { setBusy(null); } }
+  async function scrape() {
+    setBusy("scrape");
+    try {
+      const r = await fetch("/api/scrape", { method: "POST" });
+      const data = await r.json().catch(() => ({}));
+      if (data.reports) setReports(data.reports);
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
   async function match() {
     setBusy("match");
     try {
       const r = await fetch("/api/match", { method: "POST" });
-      if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.error ?? "match failed"); }
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        alert(e.error ?? "match failed");
+      } else {
+        const data = await r.json().catch(() => ({}));
+        if (data.failedJobs > 0) {
+          alert(`Scored ${data.scored}; ${data.failedJobs} jobs failed (quota?) — try again later`);
+        }
+      }
       await refresh();
-    } finally { setBusy(null); }
+    } finally {
+      setBusy(null);
+    }
   }
   async function move(id: string, status: Status) {
     await fetch("/api/jobs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) });
@@ -59,6 +81,16 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
         <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm" />
         <span className="text-sm text-neutral-400">{visible.length} jobs</span>
       </div>
+
+      {reports && (
+        <div className="flex flex-wrap gap-3 text-xs text-neutral-400">
+          {reports.map((r) => (
+            <span key={r.source} className={r.ok ? "" : "text-red-400"}>
+              {r.ok ? `✓ ${r.source} +${r.inserted} new (${r.fetched} fetched)` : `✗ ${r.source}: ${r.error}`}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {STATUSES.map((st) => (
