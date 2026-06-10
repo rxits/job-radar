@@ -5,7 +5,7 @@ import type { JobSource } from "./types";
 
 const ok: JobSource = { id: "ok", async fetch() {
   return [{ company: "Acme", title: "Eng", location: null, remote: true, salary: null,
-    url: "https://x/1", description: "d", postedAt: null }];
+    url: "https://x/1", description: "d", postedAt: null, geoRaw: null }];
 }};
 const boom: JobSource = { id: "boom", async fetch() { throw new Error("down"); } };
 

@@ -26,7 +26,7 @@ describe("normalize", () => {
   it("normalizes a raw job and attaches source + key", () => {
     const n = normalize(
       { company: "Acme", title: "Eng", location: null, remote: true, salary: null,
-        url: "https://x/1", description: "d", postedAt: null }, "hn");
+        url: "https://x/1", description: "d", postedAt: null, geoRaw: null }, "hn");
     expect(n.source).toBe("hn");
     expect(n.dedupeKey).toBe(dedupeKey("Acme", "Eng", "https://x/1"));
   });

@@ -19,7 +19,7 @@ export function geminiClient(apiKey = process.env.GEMINI_API_KEY): GeminiClient 
   };
 }
 
-function parseJson<T>(raw: string): T {
+export function parseJson<T>(raw: string): T {
   const cleaned = raw.trim().replace(/^```(?:json)?/, "").replace(/```$/, "").trim();
   return JSON.parse(cleaned) as T;
 }
@@ -85,7 +85,7 @@ export async function matchNew(
 export async function deepMatch(db: Db, client: GeminiClient, jobId: string): Promise<DeepMatch> {
   const profile = db.getProfile();
   if (!profile) throw new Error("no profile set");
-  const job = db.listJobs({}).find((j) => j.id === jobId);
+  const job = db.getJob(jobId);
   if (!job) throw new Error("job not found");
   const prompt = [
     "Deeply assess this job against the candidate. Be specific and honest.",

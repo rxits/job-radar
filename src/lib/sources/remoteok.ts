@@ -23,6 +23,7 @@ export function parseRemoteOK(rows: any[]): RawJob[] {
         // description is HTML; slice to 4000 chars
         description: String(r.description ?? (r.tags ? (r.tags as string[]).join(", ") : "")).slice(0, 4000),
         postedAt: safeDateISO(r.date),
+        geoRaw: location,
       };
     });
 }

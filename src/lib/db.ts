@@ -1,9 +1,10 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { JobRow, NormalizedJob, Status } from "./types";
+import type { Eligibility, JobRow, NormalizedJob, Status } from "./types";
 
 export interface JobFilter {
   source?: string; remote?: boolean; minScore?: number; query?: string; status?: Status;
+  eligibility?: Eligibility[];
 }
 
 export interface Db {
@@ -11,11 +12,15 @@ export interface Db {
   listJobs(f: JobFilter): JobRow[];
   unscoredJobs(): JobRow[];
   setStatus(id: string, status: Status): void;
-  saveMatch(id: string, score: number, reason: string, model: string): void;
+  saveMatch(id: string, score: number, reason: string, model: string, aiFriendly?: number | null): void;
+  setEligibility(id: string, e: Eligibility, reason: string | null): void;
   statusHistory(): { jobId: string; from: string; to: string; changedAt: string }[];
   recentActivity(limit?: number): { company: string; title: string; from: string; to: string; changedAt: string }[];
-  getProfile(): { resumeText: string; coreSkills: string } | null;
-  saveProfile(resumeText: string, coreSkills: string): void;
+  getProfile(): { resumeText: string; coreSkills: string; location: string | null; timezone: string | null; preferences: string | null } | null;
+  saveProfile(resumeText: string, coreSkills: string, location?: string | null, timezone?: string | null, preferences?: string | null): void;
+  saveTailored(jobId: string, markdown: string, model: string): void;
+  getTailored(jobId: string): { markdown: string; model: string; createdAt: string } | null;
+  getJob(id: string): JobRow | null;
   raw: Database.Database;
 }
 
@@ -26,7 +31,12 @@ CREATE TABLE IF NOT EXISTS jobs (
   salary TEXT, url TEXT NOT NULL, description TEXT NOT NULL, posted_at TEXT,
   scraped_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'to_apply'
-    CHECK (status IN ('to_apply','applied','interviewing','offer','rejected','archived'))
+    CHECK (status IN ('to_apply','applied','interviewing','offer','rejected','archived')),
+  geo_raw TEXT,
+  eligibility TEXT NOT NULL DEFAULT 'unknown',
+  eligibility_reason TEXT,
+  starred INTEGER NOT NULL DEFAULT 0,
+  seen_at TEXT
 );
 CREATE TABLE IF NOT EXISTS status_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
@@ -34,32 +44,72 @@ CREATE TABLE IF NOT EXISTS status_history (
 );
 CREATE TABLE IF NOT EXISTS matches (
   job_id TEXT PRIMARY KEY, score INTEGER NOT NULL, reason TEXT NOT NULL,
-  model TEXT NOT NULL, matched_at TEXT NOT NULL
+  model TEXT NOT NULL, matched_at TEXT NOT NULL,
+  ai_friendly INTEGER
 );
 CREATE TABLE IF NOT EXISTS profile (
   id INTEGER PRIMARY KEY CHECK (id = 1), resume_text TEXT NOT NULL,
-  core_skills TEXT NOT NULL, updated_at TEXT NOT NULL
+  core_skills TEXT NOT NULL, updated_at TEXT NOT NULL,
+  location TEXT, timezone TEXT, preferences TEXT
+);
+CREATE TABLE IF NOT EXISTS tailored (
+  job_id TEXT PRIMARY KEY, markdown TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL
 );
 `;
+
+const USER_VERSION = 2;
+
+function migrate(raw: Database.Database) {
+  raw.exec(SCHEMA); // fresh DBs get full v2 shape via IF NOT EXISTS tables
+  const v = raw.pragma("user_version", { simple: true }) as number;
+  if (v < USER_VERSION) {
+    const addCol = (table: string, ddl: string) => {
+      try { raw.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch { /* column exists */ }
+    };
+    addCol("jobs", "geo_raw TEXT");
+    addCol("jobs", "eligibility TEXT NOT NULL DEFAULT 'unknown'");
+    addCol("jobs", "eligibility_reason TEXT");
+    addCol("jobs", "starred INTEGER NOT NULL DEFAULT 0");
+    addCol("jobs", "seen_at TEXT");
+    addCol("matches", "ai_friendly INTEGER");
+    addCol("profile", "location TEXT");
+    addCol("profile", "timezone TEXT");
+    addCol("profile", "preferences TEXT");
+    raw.pragma(`user_version = ${USER_VERSION}`);
+  }
+}
 
 const SELECT = `
 SELECT j.id, j.dedupe_key as dedupeKey, j.source, j.company, j.title, j.location,
   j.remote, j.salary, j.url, j.description, j.posted_at as postedAt,
-  j.scraped_at as scrapedAt, j.status, m.score, m.reason
-FROM jobs j LEFT JOIN matches m ON m.job_id = j.id`;
+  j.scraped_at as scrapedAt, j.status, m.score, m.reason,
+  t.job_id IS NOT NULL as hasTailored,
+  j.geo_raw as geoRaw, j.eligibility, j.eligibility_reason as eligibilityReason,
+  j.starred, j.seen_at as seenAt, m.ai_friendly as aiFriendly
+FROM jobs j LEFT JOIN matches m ON m.job_id = j.id
+LEFT JOIN tailored t ON t.job_id = j.id`;
 
 function toRow(r: any): JobRow {
-  return { ...r, remote: !!r.remote, score: r.score ?? null, reason: r.reason ?? null };
+  return {
+    ...r,
+    remote: !!r.remote,
+    score: r.score ?? null,
+    reason: r.reason ?? null,
+    hasTailored: !!r.hasTailored,
+    starred: !!r.starred,
+    aiFriendly: r.aiFriendly ?? null,
+    geoRaw: r.geoRaw ?? null,
+    eligibilityReason: r.eligibilityReason ?? null,
+    seenAt: r.seenAt ?? null,
+  };
 }
 
-export function createDb(path = "data/jobradar.db"): Db {
-  const raw = new Database(path);
-  raw.pragma("journal_mode = WAL");
-  raw.exec(SCHEMA);
+export function attachDb(raw: Database.Database): Db {
+  migrate(raw);
 
   const insert = raw.prepare(`
-    INSERT INTO jobs (id, dedupe_key, source, company, title, location, remote, salary, url, description, posted_at, scraped_at)
-    VALUES (@id, @dedupeKey, @source, @company, @title, @location, @remote, @salary, @url, @description, @postedAt, @scrapedAt)
+    INSERT INTO jobs (id, dedupe_key, source, company, title, location, remote, salary, url, description, posted_at, scraped_at, geo_raw)
+    VALUES (@id, @dedupeKey, @source, @company, @title, @location, @remote, @salary, @url, @description, @postedAt, @scrapedAt, @geoRaw)
     ON CONFLICT(dedupe_key) DO NOTHING`);
 
   return {
@@ -73,6 +123,7 @@ export function createDb(path = "data/jobradar.db"): Db {
             id: randomUUID(), dedupeKey: j.dedupeKey, source: j.source, company: j.company,
             title: j.title, location: j.location, remote: j.remote ? 1 : 0, salary: j.salary,
             url: j.url, description: j.description, postedAt: j.postedAt, scrapedAt: now,
+            geoRaw: j.geoRaw ?? null,
           });
           n += res.changes;
         }
@@ -87,6 +138,11 @@ export function createDb(path = "data/jobradar.db"): Db {
       if (f.status) { where.push("j.status = @status"); p.status = f.status; }
       if (f.minScore !== undefined) { where.push("m.score >= @minScore"); p.minScore = f.minScore; }
       if (f.query) { where.push("(j.company LIKE @q OR j.title LIKE @q OR j.description LIKE @q)"); p.q = `%${f.query}%`; }
+      if (f.eligibility && f.eligibility.length > 0) {
+        const placeholders = f.eligibility.map((_, i) => `@elig${i}`).join(", ");
+        where.push(`j.eligibility IN (${placeholders})`);
+        f.eligibility.forEach((e, i) => { p[`elig${i}`] = e; });
+      }
       const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY m.score DESC NULLS LAST, j.scraped_at DESC`;
       return raw.prepare(sql).all(p).map(toRow);
     },
@@ -103,10 +159,14 @@ export function createDb(path = "data/jobradar.db"): Db {
       });
       tx();
     },
-    saveMatch(id, score, reason, model) {
-      raw.prepare(`INSERT INTO matches (job_id, score, reason, model, matched_at) VALUES (?,?,?,?,?)
-        ON CONFLICT(job_id) DO UPDATE SET score=excluded.score, reason=excluded.reason, model=excluded.model, matched_at=excluded.matched_at`)
-        .run(id, score, reason, model, new Date().toISOString());
+    setEligibility(id, e, reason) {
+      raw.prepare("UPDATE jobs SET eligibility = ?, eligibility_reason = ? WHERE id = ?")
+        .run(e, reason, id);
+    },
+    saveMatch(id, score, reason, model, aiFriendly) {
+      raw.prepare(`INSERT INTO matches (job_id, score, reason, model, matched_at, ai_friendly) VALUES (?,?,?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET score=excluded.score, reason=excluded.reason, model=excluded.model, matched_at=excluded.matched_at, ai_friendly=excluded.ai_friendly`)
+        .run(id, score, reason, model, new Date().toISOString(), aiFriendly ?? null);
     },
     statusHistory() {
       return raw.prepare("SELECT job_id as jobId, from_status as 'from', to_status as 'to', changed_at as changedAt FROM status_history ORDER BY changed_at").all() as any;
@@ -119,13 +179,39 @@ export function createDb(path = "data/jobradar.db"): Db {
       ).all(limit) as any;
     },
     getProfile() {
-      const r = raw.prepare("SELECT resume_text as resumeText, core_skills as coreSkills FROM profile WHERE id = 1").get() as any;
+      const r = raw.prepare("SELECT resume_text as resumeText, core_skills as coreSkills, location, timezone, preferences FROM profile WHERE id = 1").get() as any;
+      if (!r) return null;
+      return {
+        resumeText: r.resumeText,
+        coreSkills: r.coreSkills,
+        location: r.location ?? null,
+        timezone: r.timezone ?? null,
+        preferences: r.preferences ?? null,
+      };
+    },
+    saveProfile(resumeText, coreSkills, location, timezone, preferences) {
+      raw.prepare(`INSERT INTO profile (id, resume_text, core_skills, updated_at, location, timezone, preferences) VALUES (1,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET resume_text=excluded.resume_text, core_skills=excluded.core_skills, updated_at=excluded.updated_at, location=excluded.location, timezone=excluded.timezone, preferences=excluded.preferences`)
+        .run(resumeText, coreSkills, new Date().toISOString(), location ?? null, timezone ?? null, preferences ?? null);
+    },
+    saveTailored(jobId, markdown, model) {
+      raw.prepare(`INSERT INTO tailored (job_id, markdown, model, created_at) VALUES (?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET markdown=excluded.markdown, model=excluded.model, created_at=excluded.created_at`)
+        .run(jobId, markdown, model, new Date().toISOString());
+    },
+    getTailored(jobId) {
+      const r = raw.prepare("SELECT markdown, model, created_at as createdAt FROM tailored WHERE job_id = ?").get(jobId) as any;
       return r ?? null;
     },
-    saveProfile(resumeText, coreSkills) {
-      raw.prepare(`INSERT INTO profile (id, resume_text, core_skills, updated_at) VALUES (1,?,?,?)
-        ON CONFLICT(id) DO UPDATE SET resume_text=excluded.resume_text, core_skills=excluded.core_skills, updated_at=excluded.updated_at`)
-        .run(resumeText, coreSkills, new Date().toISOString());
+    getJob(id) {
+      const r = raw.prepare(`${SELECT} WHERE j.id = ?`).get(id) as any;
+      return r ? toRow(r) : null;
     },
   };
+}
+
+export function createDb(path = "data/jobradar.db"): Db {
+  const raw = new Database(path);
+  raw.pragma("journal_mode = WAL");
+  return attachDb(raw);
 }

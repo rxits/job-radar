@@ -35,6 +35,7 @@ export function parseHnThread(thread: any): RawJob[] {
       url: `https://news.ycombinator.com/item?id=${c.id}`,
       description: text.slice(0, 4000),
       postedAt: safeDateISO(c.created_at),
+      geoRaw: null,
     });
   }
   return jobs;

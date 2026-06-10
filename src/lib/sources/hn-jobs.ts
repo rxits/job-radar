@@ -17,6 +17,7 @@ export function parseHnJob(item: any): RawJob | null {
     url: String(item.url ?? `https://news.ycombinator.com/item?id=${item.id}`),
     description: title,
     postedAt: item.time ? safeDateISO(item.time * 1000) : null,
+    geoRaw: null,
   };
 }
 

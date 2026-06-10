@@ -1,6 +1,8 @@
 export type Status = "to_apply" | "applied" | "interviewing" | "offer" | "rejected" | "archived";
 export const STATUSES: Status[] = ["to_apply", "applied", "interviewing", "offer", "rejected", "archived"];
 
+export type Eligibility = "eligible" | "ineligible" | "unknown";
+
 export interface RawJob {
   company: string;
   title: string;
@@ -10,6 +12,7 @@ export interface RawJob {
   url: string;
   description: string;
   postedAt: string | null; // ISO
+  geoRaw: string | null; // source-provided location-restriction text, null if none
 }
 
 export interface NormalizedJob extends RawJob {
@@ -23,6 +26,12 @@ export interface JobRow extends NormalizedJob {
   scrapedAt: string;
   score: number | null;
   reason: string | null;
+  hasTailored: boolean;
+  eligibility: Eligibility;
+  eligibilityReason: string | null;
+  starred: boolean;
+  seenAt: string | null;
+  aiFriendly: number | null;
 }
 
 export interface JobSource {
@@ -30,7 +39,14 @@ export interface JobSource {
   fetch(): Promise<RawJob[]>;
 }
 
-export interface MatchResult { id: string; score: number; reason: string; }
+export interface MatchResult {
+  id: string;
+  score: number;
+  reason: string;
+  eligible: "yes" | "no" | "unclear";
+  eligibilityReason: string;
+  aiFriendly: number;
+}
 export interface DeepMatch { score: number; summary: string; gaps: string[]; tailoring: string[]; }
 
 export interface GeminiClient {

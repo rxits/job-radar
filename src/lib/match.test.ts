@@ -6,7 +6,7 @@ import type { GeminiClient, NormalizedJob } from "./types";
 function job(over: Partial<NormalizedJob> = {}): NormalizedJob {
   return { source: "t", dedupeKey: Math.random().toString(36), company: "Acme", title: "Eng",
     location: null, remote: true, salary: null, url: "https://x/" + Math.random(),
-    description: "react typescript", postedAt: null, ...over };
+    description: "react typescript", postedAt: null, geoRaw: null, ...over };
 }
 
 describe("matchNew", () => {
