@@ -147,7 +147,11 @@ export function attachDb(raw: Database.Database): Db {
       return raw.prepare(sql).all(p).map(toRow);
     },
     unscoredJobs() {
-      return raw.prepare(`${SELECT} WHERE m.job_id IS NULL ORDER BY j.scraped_at DESC`).all().map(toRow);
+      // rules-engine-rejected jobs are excluded — no Gemini quota on ruled-out jobs
+      return raw
+        .prepare(`${SELECT} WHERE m.job_id IS NULL AND j.eligibility != 'ineligible' ORDER BY j.scraped_at DESC`)
+        .all()
+        .map(toRow);
     },
     setStatus(id, status) {
       const tx = raw.transaction(() => {

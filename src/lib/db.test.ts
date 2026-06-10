@@ -58,6 +58,13 @@ describe("db", () => {
     expect(db.unscoredJobs().length).toBe(1);
   });
 
+  it("unscoredJobs excludes rules-rejected ineligible jobs", () => {
+    db.upsertJobs([job(), job({ dedupeKey: "k2", url: "https://x/2" })]);
+    const id = db.listJobs({})[0].id;
+    db.setEligibility(id, "ineligible", "restricted: US");
+    expect(db.unscoredJobs().length).toBe(1);
+  });
+
   it("filters by source, remote, minScore, query", () => {
     db.upsertJobs([
       job({ dedupeKey: "a", url: "https://x/a", source: "hn", company: "Alpha", remote: true }),

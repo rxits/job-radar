@@ -110,6 +110,7 @@ export async function deepMatch(db: Db, client: GeminiClient, jobId: string): Pr
   ].join("\n\n");
   const raw = await client.generateJSON(PRO, prompt);
   const dm = parseJson<DeepMatch>(raw);
-  db.saveMatch(jobId, Math.max(0, Math.min(100, Math.round(dm.score))), dm.summary.slice(0, 200), PRO);
+  // keep the flash-pass aiFriendly score; deep match doesn't re-judge it
+  db.saveMatch(jobId, Math.max(0, Math.min(100, Math.round(dm.score))), dm.summary.slice(0, 200), PRO, job.aiFriendly);
   return dm;
 }

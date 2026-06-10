@@ -131,6 +131,21 @@ describe("deepMatch", () => {
     expect(dm.score).toBe(72);
     expect(dm.gaps).toContain("k8s");
   });
+
+  it("preserves the flash-pass aiFriendly score", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("react dev", "react");
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.saveMatch(id, 60, "ok", "gemini-2.5-flash", 75);
+    const stub: GeminiClient = {
+      async generateJSON() {
+        return JSON.stringify({ score: 80, summary: "good", gaps: [], tailoring: [] });
+      },
+    };
+    await deepMatch(db, stub, id);
+    expect(db.listJobs({})[0].aiFriendly).toBe(75);
+  });
 });
 
 describe("matchNew v2 (eligibility + aiFriendly)", () => {
