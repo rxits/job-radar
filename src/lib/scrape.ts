@@ -14,7 +14,8 @@ export async function runScrape(db: Db, sources: JobSource[] = defaultSources): 
       const inserted = db.upsertJobs(normalized);
       reports.push({ source: s.id, ok: true, fetched: raw.length, inserted });
     } catch (e) {
-      reports.push({ source: s.id, ok: false, fetched: 0, inserted: 0, error: (e as Error).message });
+      const error = e instanceof Error ? e.message : String(e);
+      reports.push({ source: s.id, ok: false, fetched: 0, inserted: 0, error });
     }
   }
   return reports;
