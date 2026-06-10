@@ -1,5 +1,5 @@
 import type { JobSource, RawJob } from "../types";
-import { safeDateISO } from "../normalize";
+import { looksRemote, safeDateISO } from "../normalize";
 
 export function parseHnJob(item: any): RawJob | null {
   if (!item || item.type !== "job" || !item.title) return null;
@@ -12,7 +12,7 @@ export function parseHnJob(item: any): RawJob | null {
     company: company || "Unknown",
     title: role || title,
     location: null,
-    remote: /remote/i.test(title),
+    remote: looksRemote(title),
     salary: null,
     url: String(item.url ?? `https://news.ycombinator.com/item?id=${item.id}`),
     description: title,
