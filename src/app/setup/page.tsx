@@ -176,7 +176,7 @@ export default function SetupPage() {
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="City, Country — e.g. Chandigarh, India"
+              placeholder="City, Country — e.g. Berlin, Germany"
               className="w-full rounded bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
             />
           </div>
@@ -186,7 +186,7 @@ export default function SetupPage() {
               type="text"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              placeholder="IST (UTC+5:30)"
+              placeholder="CET (UTC+1) — optional"
               className="w-full rounded bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
             />
           </div>

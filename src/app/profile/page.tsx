@@ -45,7 +45,7 @@ export default function ProfilePage() {
         <input
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="City, Country — e.g. Chandigarh, India"
+          placeholder="City, Country — e.g. Berlin, Germany"
           className="mt-1 w-full rounded bg-neutral-900 p-2 text-sm"
         />
       </label>
@@ -53,7 +53,7 @@ export default function ProfilePage() {
         <input
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
-          placeholder="IST (UTC+5:30)"
+          placeholder="CET (UTC+1) — optional"
           className="mt-1 w-full rounded bg-neutral-900 p-2 text-sm"
         />
       </label>
