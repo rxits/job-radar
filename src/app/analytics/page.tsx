@@ -12,6 +12,10 @@ export default function Analytics() {
   const buckets = [0, 20, 40, 60, 80].map((lo) => ({ lo, n: scored.filter((j) => j.score! >= lo && (j.score! < lo + 20 || lo === 80)).length }));
   const total = jobs.length;
 
+  const eligibleCount = jobs.filter((j) => j.eligibility === "eligible").length;
+  const ineligibleCount = jobs.filter((j) => j.eligibility === "ineligible").length;
+  const unknownCount = jobs.filter((j) => j.eligibility === "unknown").length;
+
   const Bar = ({ label, n, max }: { label: string; n: number; max: number }) => (
     <div className="flex items-center gap-2 text-sm">
       <span className="w-28 shrink-0 text-neutral-400">{label}</span>
@@ -25,6 +29,11 @@ export default function Analytics() {
       <h1 className="text-lg font-semibold">Analytics — {total} jobs</h1>
       <section><h2 className="mb-2 text-sm uppercase text-neutral-500">Pipeline</h2>
         {byStatus.map((b) => <Bar key={b.s} label={b.s} n={b.n} max={total} />)}</section>
+      <section><h2 className="mb-2 text-sm uppercase text-neutral-500">Eligibility</h2>
+        <Bar label="eligible" n={eligibleCount} max={total} />
+        <Bar label="ineligible" n={ineligibleCount} max={total} />
+        <Bar label="unknown" n={unknownCount} max={total} />
+      </section>
       <section><h2 className="mb-2 text-sm uppercase text-neutral-500">By source</h2>
         {bySource.map((b) => <Bar key={b.src} label={b.src} n={b.n} max={total} />)}</section>
       <section><h2 className="mb-2 text-sm uppercase text-neutral-500">Match score ({scored.length} scored)</h2>

@@ -7,7 +7,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen">
         <nav className="flex gap-4 border-b border-neutral-800 px-6 py-3 text-sm">
           <Link href="/" className="font-semibold">job-radar</Link>
-          <Link href="/" className="text-neutral-400 hover:text-neutral-100">Board</Link>
+          <Link href="/" className="text-neutral-400 hover:text-neutral-100">Today</Link>
+          <Link href="/pipeline" className="text-neutral-400 hover:text-neutral-100">Pipeline</Link>
           <Link href="/analytics" className="text-neutral-400 hover:text-neutral-100">Analytics</Link>
           <Link href="/profile" className="text-neutral-400 hover:text-neutral-100">Profile</Link>
         </nav>

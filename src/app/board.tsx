@@ -2,7 +2,6 @@
 import { useState } from "react";
 import type { JobRow, Status, DeepMatch } from "@/lib/types";
 import { STATUSES } from "@/lib/types";
-import type { ScrapeReport } from "@/lib/scrape";
 
 const LABEL: Record<Status, string> = {
   to_apply: "To Apply", applied: "Applied", interviewing: "Interviewing",
@@ -11,51 +10,25 @@ const LABEL: Record<Status, string> = {
 
 export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources: string[] }) {
   const [jobs, setJobs] = useState(initialJobs);
-  const [busy, setBusy] = useState<string | null>(null);
   const [source, setSource] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [minScore, setMinScore] = useState(0);
   const [query, setQuery] = useState("");
-  const [eligFilter, setEligFilter] = useState("eligible,unknown");
-  const [reports, setReports] = useState<ScrapeReport[] | null>(null);
+  const [eligFilter, setEligFilter] = useState("");
   const [deep, setDeep] = useState<{ jobId: string; loading: boolean; data?: DeepMatch; error?: string } | null>(null);
 
   async function refresh() {
-    const r = await fetch("/api/jobs").then((r) => r.json());
+    const r = await fetch("/api/jobs?actioned=true").then((r) => r.json());
     setJobs(r.jobs);
-  }
-  async function scrape() {
-    setBusy("scrape");
-    try {
-      const r = await fetch("/api/scrape", { method: "POST" });
-      const data = await r.json().catch(() => ({}));
-      if (data.reports) setReports(data.reports);
-      await refresh();
-    } finally {
-      setBusy(null);
-    }
-  }
-  async function match() {
-    setBusy("match");
-    try {
-      const r = await fetch("/api/match", { method: "POST" });
-      if (!r.ok) {
-        const e = await r.json().catch(() => ({}));
-        alert(e.error ?? "match failed");
-      } else {
-        const data = await r.json().catch(() => ({}));
-        if (data.failedJobs > 0) {
-          alert(`Scored ${data.scored}; ${data.failedJobs} jobs failed (quota?) — try again later`);
-        }
-      }
-      await refresh();
-    } finally {
-      setBusy(null);
-    }
   }
   async function move(id: string, status: Status) {
     await fetch("/api/jobs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, status }) });
     setJobs((js) => js.map((j) => (j.id === id ? { ...j, status } : j)));
+  }
+  async function toggleStar(id: string, current: boolean) {
+    const next = !current;
+    setJobs((js) => js.map((j) => (j.id === id ? { ...j, starred: next } : j)));
+    await fetch("/api/jobs", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, starred: next }) });
   }
   async function deepMatch(jobId: string) {
     setDeep({ jobId, loading: true });
@@ -83,11 +56,8 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={scrape} disabled={!!busy} className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50">
-          {busy === "scrape" ? "Scraping…" : "Scrape now"}
-        </button>
-        <button onClick={match} disabled={!!busy} className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50">
-          {busy === "match" ? "Matching…" : "Match (Gemini)"}
+        <button onClick={refresh} className="rounded bg-neutral-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-600">
+          Refresh
         </button>
         <select value={source} onChange={(e) => setSource(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm">
           <option value="">All sources</option>
@@ -99,23 +69,13 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
         </label>
         <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm" />
         <select value={eligFilter} onChange={(e) => setEligFilter(e.target.value)} className="rounded bg-neutral-800 px-2 py-1.5 text-sm">
+          <option value="">All</option>
           <option value="eligible,unknown">Eligible + Unknown</option>
           <option value="eligible">Eligible only</option>
-          <option value="">All</option>
           <option value="ineligible">Ineligible</option>
         </select>
         <span className="text-sm text-neutral-400">{visible.length} jobs</span>
       </div>
-
-      {reports && (
-        <div className="flex flex-wrap gap-3 text-xs text-neutral-400">
-          {reports.map((r) => (
-            <span key={r.source} className={r.ok ? "" : "text-red-400"}>
-              {r.ok ? `✓ ${r.source} +${r.inserted} new (${r.fetched} fetched)` : `✗ ${r.source}: ${r.error}`}
-            </span>
-          ))}
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         {STATUSES.map((st) => (
@@ -127,6 +87,13 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
                   <div className="flex items-start justify-between gap-1">
                     <a href={j.url} target="_blank" rel="noreferrer" className="font-medium hover:underline">{j.company}</a>
                     <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        onClick={() => toggleStar(j.id, j.starred)}
+                        title={j.starred ? "Unstar" : "Star"}
+                        className={`text-sm leading-none ${j.starred ? "text-amber-400" : "text-neutral-500 hover:text-amber-400"}`}
+                      >
+                        {j.starred ? "★" : "☆"}
+                      </button>
                       {j.score != null && <span className="rounded bg-indigo-900 px-1 text-indigo-200">{j.score}</span>}
                       {j.eligibility === "eligible" && (
                         <span className="shrink-0 rounded bg-emerald-900 px-1 text-emerald-200" title={j.eligibilityReason ?? "eligible"}>✓</span>
