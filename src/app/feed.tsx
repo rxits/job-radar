@@ -188,6 +188,12 @@ export function Feed({
     window.open(j.url, "_blank");
     await patchJob(j.id, { status: "applied", seen: true });
     setJobs((prev) => prev.filter((x) => x.id !== j.id));
+    // fire-and-forget kit generation — do not await; visible later in Pipeline
+    fetch("/api/kit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jobId: j.id }),
+    }).catch(() => {});
   }
 
   async function handleSkip(j: JobRow) {

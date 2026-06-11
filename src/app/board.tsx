@@ -9,7 +9,8 @@ const LABEL: Record<Status, string> = {
 };
 
 export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources: string[] }) {
-  const [jobs, setJobs] = useState(initialJobs);
+  const [jobs, setJobs] = useState<JobRow[]>(initialJobs);
+  const [kitBusy, setKitBusy] = useState<string | null>(null);
   const [source, setSource] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [minScore, setMinScore] = useState(0);
@@ -44,6 +45,27 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
       }
     } catch {
       setDeep({ jobId, loading: false, error: "deep match failed" });
+    }
+  }
+
+  async function makeKit(jobId: string) {
+    setKitBusy(jobId);
+    try {
+      const r = await fetch("/api/kit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        alert(body.error ?? "kit generation failed");
+        return;
+      }
+      setJobs((js) => js.map((j) => j.id === jobId ? { ...j, hasKit: true } : j));
+    } catch {
+      alert("kit generation failed");
+    } finally {
+      setKitBusy(null);
     }
   }
 
@@ -114,6 +136,22 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
                   <div className="mt-1 flex items-center justify-between">
                     <span className="text-neutral-600">{j.source}</span>
                     <div className="flex items-center gap-1">
+                      {j.hasKit ? (
+                        <a
+                          href={`/kit/${j.id}`}
+                          className="text-[10px] text-emerald-400 hover:underline"
+                        >
+                          Kit ▸
+                        </a>
+                      ) : j.status === "applied" ? (
+                        <button
+                          onClick={() => makeKit(j.id)}
+                          disabled={kitBusy === j.id}
+                          className="text-[10px] rounded bg-emerald-900 hover:bg-emerald-800 px-1 py-0.5 disabled:opacity-50"
+                        >
+                          {kitBusy === j.id ? "…" : "Make kit"}
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => deepMatch(j.id)}
                         disabled={!!deep?.loading}
