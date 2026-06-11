@@ -168,6 +168,60 @@ describe("db", () => {
     expect(db.listJobs({})[0].geoRaw).toBe("Worldwide");
   });
 
+  it("markSeen sets seen_at once", () => {
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.markSeen(id);
+    const first = db.listJobs({})[0].seenAt;
+    expect(first).toBeTruthy();
+    db.markSeen(id);
+    expect(db.listJobs({})[0].seenAt).toBe(first); // not refreshed
+  });
+
+  it("setStarred toggles", () => {
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.setStarred(id, true);
+    expect(db.listJobs({ starred: true }).length).toBe(1);
+    db.setStarred(id, false);
+    expect(db.listJobs({ starred: true }).length).toBe(0);
+  });
+
+  it("unseenOnly filters out seen jobs", () => {
+    db.upsertJobs([job(), job({ dedupeKey: "k2", url: "https://x/2" })]);
+    db.markSeen(db.listJobs({})[0].id);
+    expect(db.listJobs({ unseenOnly: true }).length).toBe(1);
+  });
+
+  it("actioned returns starred or non-to_apply jobs only", () => {
+    db.upsertJobs([job(), job({ dedupeKey: "k2", url: "https://x/2" }), job({ dedupeKey: "k3", url: "https://x/3" })]);
+    const [a, b] = db.listJobs({});
+    db.setStatus(a.id, "applied");
+    db.setStarred(b.id, true);
+    expect(db.listJobs({ actioned: true }).length).toBe(2);
+  });
+
+  it("orders by score then aiFriendly", () => {
+    db.upsertJobs([job(), job({ dedupeKey: "k2", url: "https://x/2" })]);
+    const [a, b] = db.listJobs({});
+    db.saveMatch(a.id, 80, "r", "m", 50);
+    db.saveMatch(b.id, 80, "r", "m", 90);
+    expect(db.listJobs({})[0].id).toBe(b.id); // same score, higher aiFriendly first
+  });
+
+  it("needsFollowUp returns applied jobs with no recent history", () => {
+    db.upsertJobs([job(), job({ dedupeKey: "k2", url: "https://x/2" })]);
+    const [a, b] = db.listJobs({});
+    // Set both to applied — creates history rows with current timestamp
+    db.setStatus(a.id, "applied");
+    db.setStatus(b.id, "applied");
+    // Backdate job a's history row to 8 days ago
+    db.raw.prepare("UPDATE status_history SET changed_at = datetime('now', '-8 days') WHERE job_id = ?").run(a.id);
+    const followUps = db.needsFollowUp(7);
+    expect(followUps.length).toBe(1);
+    expect(followUps[0].id).toBe(a.id);
+  });
+
   it("recentActivity returns rows newest-first with company/title/from/to", () => {
     db.upsertJobs([
       job({ dedupeKey: "ra1", url: "https://x/ra1", company: "Acme", title: "Engineer" }),

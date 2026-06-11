@@ -5,6 +5,9 @@ import type { Eligibility, JobRow, NormalizedJob, Status } from "./types";
 export interface JobFilter {
   source?: string; remote?: boolean; minScore?: number; query?: string; status?: Status;
   eligibility?: Eligibility[];
+  unseenOnly?: boolean;
+  starred?: boolean;
+  actioned?: boolean;
 }
 
 export interface Db {
@@ -12,6 +15,9 @@ export interface Db {
   listJobs(f: JobFilter): JobRow[];
   unscoredJobs(): JobRow[];
   setStatus(id: string, status: Status): void;
+  markSeen(id: string): void;
+  setStarred(id: string, starred: boolean): void;
+  needsFollowUp(days?: number): JobRow[];
   saveMatch(id: string, score: number, reason: string, model: string, aiFriendly?: number | null): void;
   setEligibility(id: string, e: Eligibility, reason: string | null): void;
   statusHistory(): { jobId: string; from: string; to: string; changedAt: string }[];
@@ -143,7 +149,10 @@ export function attachDb(raw: Database.Database): Db {
         where.push(`j.eligibility IN (${placeholders})`);
         f.eligibility.forEach((e, i) => { p[`elig${i}`] = e; });
       }
-      const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY m.score DESC NULLS LAST, j.scraped_at DESC`;
+      if (f.unseenOnly) { where.push("j.seen_at IS NULL"); }
+      if (f.starred) { where.push("j.starred = 1"); }
+      if (f.actioned) { where.push("(j.status != 'to_apply' OR j.starred = 1)"); }
+      const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY m.score DESC NULLS LAST, m.ai_friendly DESC NULLS LAST, j.scraped_at DESC`;
       return raw.prepare(sql).all(p).map(toRow);
     },
     unscoredJobs() {
@@ -152,6 +161,20 @@ export function attachDb(raw: Database.Database): Db {
         .prepare(`${SELECT} WHERE m.job_id IS NULL AND j.eligibility != 'ineligible' ORDER BY j.scraped_at DESC`)
         .all()
         .map(toRow);
+    },
+    markSeen(id) {
+      raw.prepare("UPDATE jobs SET seen_at = ? WHERE id = ? AND seen_at IS NULL")
+        .run(new Date().toISOString(), id);
+    },
+    setStarred(id, starred) {
+      raw.prepare("UPDATE jobs SET starred = ? WHERE id = ?").run(starred ? 1 : 0, id);
+    },
+    needsFollowUp(days = 7) {
+      return raw.prepare(
+        `${SELECT} WHERE j.status = 'applied' AND NOT EXISTS (
+          SELECT 1 FROM status_history h WHERE h.job_id = j.id AND h.changed_at > datetime('now', '-' || ? || ' days')
+        ) ORDER BY m.score DESC NULLS LAST, m.ai_friendly DESC NULLS LAST, j.scraped_at DESC`
+      ).all(days).map(toRow);
     },
     setStatus(id, status) {
       const tx = raw.transaction(() => {
