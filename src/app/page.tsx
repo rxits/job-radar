@@ -1,10 +1,12 @@
+import { requireProfile } from "@/lib/guard";
 import { db } from "@/lib/server-db";
-import { Board } from "./board";
+import { Feed } from "./feed";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const jobs = db().listJobs({});
-  const sources = [...new Set(jobs.map((j) => j.source))];
-  return <Board initialJobs={jobs} sources={sources} />;
+export default function Today() {
+  requireProfile();
+  const jobs = db().listJobs({ eligibility: ["eligible", "unknown"], status: "to_apply", unseenOnly: true });
+  const followUps = db().needsFollowUp();
+  return <Feed initialJobs={jobs} followUps={followUps} />;
 }
