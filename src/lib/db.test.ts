@@ -222,6 +222,27 @@ describe("db", () => {
     expect(followUps[0].id).toBe(a.id);
   });
 
+  it("saveKit/getKit round-trip and hasKit flag", () => {
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    expect(db.getJob(id)!.hasKit).toBe(false);
+    db.saveKit(id, { resumeMd: "# R", coverMd: "C", outreachMd: "O" }, "gemini-2.5-pro");
+    const k = db.getKit(id)!;
+    expect(k.resumeMd).toBe("# R");
+    expect(k.model).toBe("gemini-2.5-pro");
+    expect(db.getJob(id)!.hasKit).toBe(true);
+  });
+
+  it("saveKit upserts (regenerate overwrites)", () => {
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    db.saveKit(id, { resumeMd: "v1", coverMd: "c", outreachMd: "o" }, "m");
+    db.saveKit(id, { resumeMd: "v2", coverMd: "c", outreachMd: "o" }, "m");
+    expect(db.getKit(id)!.resumeMd).toBe("v2");
+  });
+
+  it("getKit null for unknown", () => { expect(db.getKit("nope")).toBeNull(); });
+
   it("recentActivity returns rows newest-first with company/title/from/to", () => {
     db.upsertJobs([
       job({ dedupeKey: "ra1", url: "https://x/ra1", company: "Acme", title: "Engineer" }),

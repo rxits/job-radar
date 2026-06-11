@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { Eligibility, JobRow, NormalizedJob, Status } from "./types";
+import type { Eligibility, JobRow, Kit, NormalizedJob, Status } from "./types";
 
 export interface JobFilter {
   source?: string; remote?: boolean; minScore?: number; query?: string; status?: Status;
@@ -26,6 +26,8 @@ export interface Db {
   saveProfile(resumeText: string, coreSkills: string, location?: string | null, timezone?: string | null, preferences?: string | null): void;
   saveTailored(jobId: string, markdown: string, model: string): void;
   getTailored(jobId: string): { markdown: string; model: string; createdAt: string } | null;
+  saveKit(jobId: string, kit: { resumeMd: string; coverMd: string; outreachMd: string }, model: string): void;
+  getKit(jobId: string): Kit | null;
   getJob(id: string): JobRow | null;
   raw: Database.Database;
 }
@@ -61,9 +63,13 @@ CREATE TABLE IF NOT EXISTS profile (
 CREATE TABLE IF NOT EXISTS tailored (
   job_id TEXT PRIMARY KEY, markdown TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS kits (
+  job_id TEXT PRIMARY KEY, resume_md TEXT NOT NULL, cover_md TEXT NOT NULL,
+  outreach_md TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL
+);
 `;
 
-const USER_VERSION = 2;
+const USER_VERSION = 3;
 
 function migrate(raw: Database.Database) {
   raw.exec(SCHEMA); // fresh DBs get full v2 shape via IF NOT EXISTS tables
@@ -81,6 +87,10 @@ function migrate(raw: Database.Database) {
     addCol("profile", "location TEXT");
     addCol("profile", "timezone TEXT");
     addCol("profile", "preferences TEXT");
+    raw.exec(`CREATE TABLE IF NOT EXISTS kits (
+      job_id TEXT PRIMARY KEY, resume_md TEXT NOT NULL, cover_md TEXT NOT NULL,
+      outreach_md TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL
+    )`);
     raw.pragma(`user_version = ${USER_VERSION}`);
   }
 }
@@ -90,10 +100,12 @@ SELECT j.id, j.dedupe_key as dedupeKey, j.source, j.company, j.title, j.location
   j.remote, j.salary, j.url, j.description, j.posted_at as postedAt,
   j.scraped_at as scrapedAt, j.status, m.score, m.reason,
   t.job_id IS NOT NULL as hasTailored,
+  k.job_id IS NOT NULL as hasKit,
   j.geo_raw as geoRaw, j.eligibility, j.eligibility_reason as eligibilityReason,
   j.starred, j.seen_at as seenAt, m.ai_friendly as aiFriendly
 FROM jobs j LEFT JOIN matches m ON m.job_id = j.id
-LEFT JOIN tailored t ON t.job_id = j.id`;
+LEFT JOIN tailored t ON t.job_id = j.id
+LEFT JOIN kits k ON k.job_id = j.id`;
 
 function toRow(r: any): JobRow {
   return {
@@ -102,6 +114,7 @@ function toRow(r: any): JobRow {
     score: r.score ?? null,
     reason: r.reason ?? null,
     hasTailored: !!r.hasTailored,
+    hasKit: !!r.hasKit,
     starred: !!r.starred,
     aiFriendly: r.aiFriendly ?? null,
     geoRaw: r.geoRaw ?? null,
@@ -228,6 +241,15 @@ export function attachDb(raw: Database.Database): Db {
     },
     getTailored(jobId) {
       const r = raw.prepare("SELECT markdown, model, created_at as createdAt FROM tailored WHERE job_id = ?").get(jobId) as any;
+      return r ?? null;
+    },
+    saveKit(jobId, kit, model) {
+      raw.prepare(`INSERT INTO kits (job_id, resume_md, cover_md, outreach_md, model, created_at) VALUES (?,?,?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET resume_md=excluded.resume_md, cover_md=excluded.cover_md, outreach_md=excluded.outreach_md, model=excluded.model, created_at=excluded.created_at`)
+        .run(jobId, kit.resumeMd, kit.coverMd, kit.outreachMd, model, new Date().toISOString());
+    },
+    getKit(jobId) {
+      const r = raw.prepare("SELECT resume_md as resumeMd, cover_md as coverMd, outreach_md as outreachMd, model, created_at as createdAt FROM kits WHERE job_id = ?").get(jobId) as any;
       return r ?? null;
     },
     getJob(id) {

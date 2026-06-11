@@ -27,11 +27,20 @@ export interface JobRow extends NormalizedJob {
   score: number | null;
   reason: string | null;
   hasTailored: boolean;
+  hasKit: boolean;
   eligibility: Eligibility;
   eligibilityReason: string | null;
   starred: boolean;
   seenAt: string | null;
   aiFriendly: number | null;
+}
+
+export interface Kit {
+  resumeMd: string;
+  coverMd: string;
+  outreachMd: string;
+  model: string;
+  createdAt: string;
 }
 
 export interface JobSource {
