@@ -23,15 +23,23 @@ export async function GET(req: Request) {
     query: u.searchParams.get("query") || undefined,
     status: (u.searchParams.get("status") as Status) || undefined,
     eligibility,
+    actioned: u.searchParams.get("actioned") === "true" || undefined,
   };
   return NextResponse.json({ jobs: db().listJobs(f) });
 }
 
 export async function PATCH(req: Request) {
-  const { id, status } = await req.json();
-  if (!id || !status || !STATUSES.includes(status)) {
-    return NextResponse.json({ error: "id and a valid status required" }, { status: 400 });
+  let body: any;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "invalid json" }, { status: 400 }); }
+  const { id, status, seen, starred } = body ?? {};
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (status !== undefined) {
+    if (!STATUSES.includes(status)) return NextResponse.json({ error: "invalid status" }, { status: 400 });
+    db().setStatus(id, status as Status);
   }
-  db().setStatus(id, status as Status);
+  if (seen === true) db().markSeen(id);
+  if (starred !== undefined) db().setStarred(id, !!starred);
+  if (status === undefined && seen === undefined && starred === undefined)
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
