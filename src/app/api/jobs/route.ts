@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     status: (u.searchParams.get("status") as Status) || undefined,
     eligibility,
     actioned: u.searchParams.get("actioned") === "true" || undefined,
+    unseenOnly: u.searchParams.get("unseen") === "true" || undefined,
   };
   return NextResponse.json({ jobs: db().listJobs(f) });
 }

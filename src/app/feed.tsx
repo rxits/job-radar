@@ -165,41 +165,38 @@ export function Feed({
       const r = await fetch("/api/refresh", { method: "POST" });
       const data: RefreshResult = await r.json().catch(() => ({}));
       setRefreshResult(data);
+    } catch {
+      setRefreshResult({ match: { error: "refresh failed — try again" } });
     } finally {
-      setBusy(false);
-      // reload to re-render server-side with new jobs
-      window.location.reload();
+      // let the summary strip paint, then re-render server-side with new jobs
+      setTimeout(() => window.location.reload(), 1800);
     }
   }
 
   async function toggleShowSeen() {
-    if (!showSeen) {
-      const r = await fetch("/api/jobs?status=to_apply&eligibility=eligible,unknown");
-      const data = await r.json().catch(() => ({ jobs: [] }));
-      setJobs(data.jobs ?? []);
-      setShowSeen(true);
-    } else {
-      setJobs(initialJobs);
-      setShowSeen(false);
-    }
+    const url = showSeen
+      ? "/api/jobs?status=to_apply&eligibility=eligible,unknown&unseen=true"
+      : "/api/jobs?status=to_apply&eligibility=eligible,unknown";
+    const r = await fetch(url);
+    const data = await r.json().catch(() => ({ jobs: [] }));
+    setJobs(data.jobs ?? []);
+    setShowSeen(!showSeen);
   }
 
   async function handleApply(j: JobRow) {
-    await patchJob(j.id, { status: "applied" });
-    await patchJob(j.id, { seen: true });
+    // must run synchronously with the click — popup blockers kill it after an await
     window.open(j.url, "_blank");
+    await patchJob(j.id, { status: "applied", seen: true });
     setJobs((prev) => prev.filter((x) => x.id !== j.id));
   }
 
   async function handleSkip(j: JobRow) {
-    await patchJob(j.id, { status: "archived" });
-    await patchJob(j.id, { seen: true });
+    await patchJob(j.id, { status: "archived", seen: true });
     setJobs((prev) => prev.filter((x) => x.id !== j.id));
   }
 
   async function handleSave(j: JobRow) {
-    await patchJob(j.id, { starred: true });
-    await patchJob(j.id, { seen: true });
+    await patchJob(j.id, { starred: true, seen: true });
     setSavedIds((prev) => new Set(prev).add(j.id));
     // brief flash then remove card
     setTimeout(() => {
