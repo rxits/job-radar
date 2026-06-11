@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tailorResume } from "./tailor";
+import { generateKit } from "./tailor";
 import { createDb } from "./db";
 import type { GeminiClient, NormalizedJob } from "./types";
 
@@ -11,7 +11,7 @@ function job(over: Partial<NormalizedJob> = {}): NormalizedJob {
   };
 }
 
-const stubMarkdown = "# Alice Smith\n\n## Summary\nExperienced engineer.\n";
+const stubKit = { resumeMd: "# Alice Smith\n\n## Summary\nExperienced.", coverMd: "Dear Hiring Manager,", outreachMd: "Subject: Interested\nHi," };
 
 function makeStub(response: string): GeminiClient {
   return {
@@ -19,25 +19,26 @@ function makeStub(response: string): GeminiClient {
   };
 }
 
-describe("tailorResume", () => {
-  it("happy path: returns markdown, persists via getTailored, hasTailored flips true", async () => {
+describe("generateKit", () => {
+  it("happy path: returns KitDraft, persists via getKit, hasKit flips true", async () => {
     const db = createDb(":memory:");
     db.saveProfile("Alice Smith\nSenior Engineer with 5 years React/TypeScript", "react, typescript");
     db.upsertJobs([job()]);
     const id = db.listJobs({})[0].id;
 
-    const stub = makeStub(JSON.stringify({ markdown: stubMarkdown }));
-    const result = await tailorResume(db, stub, id);
+    const stub = makeStub(JSON.stringify(stubKit));
+    const result = await generateKit(db, stub, id);
 
-    expect(result.markdown).toBe(stubMarkdown);
+    expect(result.resumeMd).toBe(stubKit.resumeMd);
+    expect(result.coverMd).toBe(stubKit.coverMd);
+    expect(result.outreachMd).toBe(stubKit.outreachMd);
 
-    const saved = db.getTailored(id);
+    const saved = db.getKit(id)!;
     expect(saved).not.toBeNull();
-    expect(saved!.markdown).toBe(stubMarkdown);
-    expect(saved!.model).toBe("gemini-2.5-pro");
+    expect(saved.resumeMd).toBe(stubKit.resumeMd);
+    expect(saved.model).toBe("gemini-2.5-pro");
 
-    const row = db.getJob(id);
-    expect(row!.hasTailored).toBe(true);
+    expect(db.getJob(id)!.hasKit).toBe(true);
   });
 
   it("throws 'no profile set' without profile — stub must not be called", async () => {
@@ -47,32 +48,32 @@ describe("tailorResume", () => {
     const stub: GeminiClient = {
       async generateJSON() { throw new Error("stub should not be called"); },
     };
-    await expect(tailorResume(db, stub, id)).rejects.toThrow("no profile set");
+    await expect(generateKit(db, stub, id)).rejects.toThrow("no profile set");
   });
 
   it("throws 'job not found' for bogus id", async () => {
     const db = createDb(":memory:");
     db.saveProfile("resume", "ts");
-    const stub = makeStub(JSON.stringify({ markdown: stubMarkdown }));
-    await expect(tailorResume(db, stub, "no-such-id")).rejects.toThrow("job not found");
+    const stub = makeStub(JSON.stringify(stubKit));
+    await expect(generateKit(db, stub, "no-such-id")).rejects.toThrow("job not found");
   });
 
-  it("throws 'empty tailoring result' when stub returns {markdown: ''}", async () => {
+  it("throws on empty artifact when stub returns empty resumeMd", async () => {
     const db = createDb(":memory:");
     db.saveProfile("resume", "ts");
     db.upsertJobs([job()]);
     const id = db.listJobs({})[0].id;
-    const stub = makeStub(JSON.stringify({ markdown: "" }));
-    await expect(tailorResume(db, stub, id)).rejects.toThrow("empty tailoring result");
+    const stub = makeStub(JSON.stringify({ resumeMd: "", coverMd: "C", outreachMd: "O" }));
+    await expect(generateKit(db, stub, id)).rejects.toThrow("empty resumeMd in kit result");
   });
 
-  it("fence-wrapped response still parses", async () => {
+  it("fence-wrapped JSON response still parses", async () => {
     const db = createDb(":memory:");
     db.saveProfile("Alice Smith\nReact dev", "react");
     db.upsertJobs([job()]);
     const id = db.listJobs({})[0].id;
-    const stub = makeStub("```json\n" + JSON.stringify({ markdown: stubMarkdown }) + "\n```");
-    const result = await tailorResume(db, stub, id);
-    expect(result.markdown).toBe(stubMarkdown);
+    const stub = makeStub("```json\n" + JSON.stringify(stubKit) + "\n```");
+    const result = await generateKit(db, stub, id);
+    expect(result.resumeMd).toBe(stubKit.resumeMd);
   });
 });
