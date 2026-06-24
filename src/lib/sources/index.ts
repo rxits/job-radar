@@ -6,5 +6,6 @@ import { remotiveSource } from "./remotive";
 import { jobicySource } from "./jobicy";
 import { himalayasSource } from "./himalayas";
 import { wwrSource } from "./wwr";
+import { linkedinSource } from "./linkedin";
 
-export const sources: JobSource[] = [hnHiringSource, remoteOkSource, hnJobsSource, remotiveSource, jobicySource, himalayasSource, wwrSource];
+export const sources: JobSource[] = [hnHiringSource, remoteOkSource, hnJobsSource, remotiveSource, jobicySource, himalayasSource, wwrSource, linkedinSource];
