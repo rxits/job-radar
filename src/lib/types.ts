@@ -33,6 +33,20 @@ export interface JobRow extends NormalizedJob {
   starred: boolean;
   seenAt: string | null;
   aiFriendly: number | null;
+  isInternship: boolean;
+  payTier: string | null;
+  region: string | null;
+}
+
+export interface Contact {
+  jobId: string;
+  company: string;
+  personName: string | null;
+  personTitle: string | null;
+  emails: string[];
+  links: string[];
+  source: string;
+  confidence: "found" | "guessed" | "none";
 }
 
 export interface Kit {

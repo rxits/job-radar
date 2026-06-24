@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import type { Eligibility, JobRow, Kit, NormalizedJob, Status } from "./types";
+import { detectInternship, payTier, regionOf } from "./classify";
 
 export interface JobFilter {
   source?: string; remote?: boolean; minScore?: number; query?: string; status?: Status;
@@ -44,7 +45,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   eligibility TEXT NOT NULL DEFAULT 'unknown',
   eligibility_reason TEXT,
   starred INTEGER NOT NULL DEFAULT 0,
-  seen_at TEXT
+  seen_at TEXT,
+  is_internship INTEGER NOT NULL DEFAULT 0,
+  pay_tier TEXT,
+  region TEXT
+);
+CREATE TABLE IF NOT EXISTS contacts (
+  job_id TEXT PRIMARY KEY, company TEXT, person_name TEXT, person_title TEXT,
+  emails TEXT, links TEXT, source TEXT, confidence TEXT, model TEXT, created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS status_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
@@ -69,7 +77,7 @@ CREATE TABLE IF NOT EXISTS kits (
 );
 `;
 
-const USER_VERSION = 3;
+const USER_VERSION = 4;
 
 function migrate(raw: Database.Database) {
   raw.exec(SCHEMA); // fresh DBs get full v2 shape via IF NOT EXISTS tables
@@ -91,8 +99,37 @@ function migrate(raw: Database.Database) {
       job_id TEXT PRIMARY KEY, resume_md TEXT NOT NULL, cover_md TEXT NOT NULL,
       outreach_md TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL
     )`);
+    // v4: internship/pay/region classification + contacts
+    addCol("jobs", "is_internship INTEGER NOT NULL DEFAULT 0");
+    addCol("jobs", "pay_tier TEXT");
+    addCol("jobs", "region TEXT");
+    raw.exec(`CREATE TABLE IF NOT EXISTS contacts (
+      job_id TEXT PRIMARY KEY, company TEXT, person_name TEXT, person_title TEXT,
+      emails TEXT, links TEXT, source TEXT, confidence TEXT, model TEXT, created_at TEXT
+    )`);
     raw.pragma(`user_version = ${USER_VERSION}`);
   }
+}
+
+// One-time backfill: classify pre-v4 rows (region/pay_tier left NULL by the migration)
+// so existing jobs are immediately rankable. Cheap and idempotent (only touches NULL rows).
+function backfillClassification(raw: Database.Database) {
+  const rows = raw.prepare(
+    "SELECT id, title, description, salary, location, geo_raw as geoRaw FROM jobs WHERE region IS NULL AND pay_tier IS NULL"
+  ).all() as any[];
+  if (rows.length === 0) return;
+  const upd = raw.prepare("UPDATE jobs SET is_internship = ?, pay_tier = ?, region = ? WHERE id = ?");
+  const tx = raw.transaction((items: any[]) => {
+    for (const r of items) {
+      upd.run(
+        detectInternship(r.title, r.description) ? 1 : 0,
+        payTier(r.salary),
+        regionOf(r.location, r.geoRaw),
+        r.id,
+      );
+    }
+  });
+  tx(rows);
 }
 
 const SELECT = `
@@ -102,7 +139,8 @@ SELECT j.id, j.dedupe_key as dedupeKey, j.source, j.company, j.title, j.location
   t.job_id IS NOT NULL as hasTailored,
   k.job_id IS NOT NULL as hasKit,
   j.geo_raw as geoRaw, j.eligibility, j.eligibility_reason as eligibilityReason,
-  j.starred, j.seen_at as seenAt, m.ai_friendly as aiFriendly
+  j.starred, j.seen_at as seenAt, m.ai_friendly as aiFriendly,
+  j.is_internship as isInternship, j.pay_tier as payTier, j.region as region
 FROM jobs j LEFT JOIN matches m ON m.job_id = j.id
 LEFT JOIN tailored t ON t.job_id = j.id
 LEFT JOIN kits k ON k.job_id = j.id`;
@@ -120,15 +158,19 @@ function toRow(r: any): JobRow {
     geoRaw: r.geoRaw ?? null,
     eligibilityReason: r.eligibilityReason ?? null,
     seenAt: r.seenAt ?? null,
+    isInternship: !!r.isInternship,
+    payTier: r.payTier ?? null,
+    region: r.region ?? null,
   };
 }
 
 export function attachDb(raw: Database.Database): Db {
   migrate(raw);
+  backfillClassification(raw);
 
   const insert = raw.prepare(`
-    INSERT INTO jobs (id, dedupe_key, source, company, title, location, remote, salary, url, description, posted_at, scraped_at, geo_raw)
-    VALUES (@id, @dedupeKey, @source, @company, @title, @location, @remote, @salary, @url, @description, @postedAt, @scrapedAt, @geoRaw)
+    INSERT INTO jobs (id, dedupe_key, source, company, title, location, remote, salary, url, description, posted_at, scraped_at, geo_raw, is_internship, pay_tier, region)
+    VALUES (@id, @dedupeKey, @source, @company, @title, @location, @remote, @salary, @url, @description, @postedAt, @scrapedAt, @geoRaw, @isInternship, @payTier, @region)
     ON CONFLICT(dedupe_key) DO NOTHING`);
 
   return {
@@ -143,6 +185,9 @@ export function attachDb(raw: Database.Database): Db {
             title: j.title, location: j.location, remote: j.remote ? 1 : 0, salary: j.salary,
             url: j.url, description: j.description, postedAt: j.postedAt, scrapedAt: now,
             geoRaw: j.geoRaw ?? null,
+            isInternship: detectInternship(j.title, j.description) ? 1 : 0,
+            payTier: payTier(j.salary),
+            region: regionOf(j.location, j.geoRaw),
           });
           n += res.changes;
         }
