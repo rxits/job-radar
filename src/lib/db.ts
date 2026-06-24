@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import type { Eligibility, JobRow, Kit, NormalizedJob, Status } from "./types";
+import type { Contact, Eligibility, JobRow, Kit, NormalizedJob, Status } from "./types";
 import { detectInternship, payTier, regionOf } from "./classify";
 
 export interface JobFilter {
@@ -33,6 +33,8 @@ export interface Db {
   saveKit(jobId: string, kit: { resumeMd: string; coverMd: string; outreachMd: string }, model: string): void;
   getKit(jobId: string): Kit | null;
   getJob(id: string): JobRow | null;
+  saveContact(c: Contact, model: string): void;
+  getContact(jobId: string): Contact | null;
   raw: Database.Database;
 }
 
@@ -307,6 +309,18 @@ export function attachDb(raw: Database.Database): Db {
     getJob(id) {
       const r = raw.prepare(`${SELECT} WHERE j.id = ?`).get(id) as any;
       return r ? toRow(r) : null;
+    },
+    saveContact(c, model) {
+      raw.prepare(`INSERT INTO contacts (job_id, company, person_name, person_title, emails, links, source, confidence, model, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(job_id) DO UPDATE SET company=excluded.company, person_name=excluded.person_name, person_title=excluded.person_title, emails=excluded.emails, links=excluded.links, source=excluded.source, confidence=excluded.confidence, model=excluded.model, created_at=excluded.created_at`)
+        .run(c.jobId, c.company, c.personName, c.personTitle, JSON.stringify(c.emails), JSON.stringify(c.links), c.source, c.confidence, model, new Date().toISOString());
+    },
+    getContact(jobId) {
+      const r = raw.prepare("SELECT job_id as jobId, company, person_name as personName, person_title as personTitle, emails, links, source, confidence FROM contacts WHERE job_id = ?").get(jobId) as any;
+      if (!r) return null;
+      const parse = (s: string): string[] => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; } };
+      return { ...r, emails: parse(r.emails), links: parse(r.links) } as Contact;
     },
   };
 }
