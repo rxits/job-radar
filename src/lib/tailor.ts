@@ -1,5 +1,5 @@
 import type { Db } from "./db";
-import type { GeminiClient } from "./types";
+import type { Contact, GeminiClient } from "./types";
 import { parseJson, PRO } from "./match";
 
 const RULES = [
@@ -14,11 +14,15 @@ const RULES = [
 
 export interface KitDraft { resumeMd: string; coverMd: string; outreachMd: string; }
 
-export async function generateKit(db: Db, client: GeminiClient, jobId: string): Promise<KitDraft> {
+export async function generateKit(db: Db, client: GeminiClient, jobId: string, contact?: Contact | null): Promise<KitDraft> {
   const profile = db.getProfile();
   if (!profile || !profile.resumeText.trim()) throw new Error("no profile set — add your resume in /profile first");
   const job = db.getJob(jobId);
   if (!job) throw new Error("job not found");
+  const contactBlock =
+    contact && contact.personName
+      ? `KNOWN CONTACT: Address the outreach email directly to ${contact.personName}${contact.personTitle ? ` (${contact.personTitle})` : ""}. Greet them by first name. ${contact.emails[0] ? `Their email is ${contact.emails[0]} — open the outreach with a line noting it is addressed to that address.` : ""}`
+      : null;
   const prompt = [
     "Create a complete job-application kit for this candidate and job.",
     RULES,
@@ -26,6 +30,7 @@ export async function generateKit(db: Db, client: GeminiClient, jobId: string): 
     `CORE SKILLS: ${profile.coreSkills}`,
     `CANDIDATE PREFERENCES: ${profile.preferences ?? "none stated"}`,
     `TARGET JOB: ${job.title} at ${job.company}\n${job.description.slice(0, 3000)}`,
+    ...(contactBlock ? [contactBlock] : []),
     'Return ONLY JSON: {"resumeMd": string, "coverMd": string, "outreachMd": string}.',
   ].join("\n\n");
   const raw = await client.generateJSON(PRO, prompt);

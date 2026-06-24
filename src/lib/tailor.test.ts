@@ -67,6 +67,36 @@ describe("generateKit", () => {
     await expect(generateKit(db, stub, id)).rejects.toThrow("empty resumeMd in kit result");
   });
 
+  it("addresses outreach to the named contact when one is passed", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("Alice Smith\nReact dev", "react");
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    let captured = "";
+    const stub: GeminiClient = {
+      async generateJSON(_m, prompt) { captured = prompt; return JSON.stringify(stubKit); },
+    };
+    await generateKit(db, stub, id, {
+      jobId: id, company: "Acme", personName: "Jane Doe", personTitle: "CTO",
+      emails: ["jane@acme.com"], links: [], source: "acme.com", confidence: "found",
+    });
+    expect(captured).toContain("Jane Doe");
+    expect(captured).toContain("jane@acme.com");
+  });
+
+  it("omits contact instructions when no contact is passed", async () => {
+    const db = createDb(":memory:");
+    db.saveProfile("Alice Smith\nReact dev", "react");
+    db.upsertJobs([job()]);
+    const id = db.listJobs({})[0].id;
+    let captured = "";
+    const stub: GeminiClient = {
+      async generateJSON(_m, prompt) { captured = prompt; return JSON.stringify(stubKit); },
+    };
+    await generateKit(db, stub, id);
+    expect(captured).not.toContain("KNOWN CONTACT");
+  });
+
   it("fence-wrapped JSON response still parses", async () => {
     const db = createDb(":memory:");
     db.saveProfile("Alice Smith\nReact dev", "react");
