@@ -25,6 +25,9 @@ export async function GET(req: Request) {
     eligibility,
     actioned: u.searchParams.get("actioned") === "true" || undefined,
     unseenOnly: u.searchParams.get("unseen") === "true" || undefined,
+    region: u.searchParams.get("region") || undefined,
+    payTier: u.searchParams.get("payTier") || undefined,
+    internship: u.searchParams.has("internship") ? u.searchParams.get("internship") === "true" : undefined,
   };
   return NextResponse.json({ jobs: db().listJobs(f) });
 }

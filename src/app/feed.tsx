@@ -79,6 +79,21 @@ function JobCard({
             </span>
           )}
           <EligBadge j={j} />
+          {j.payTier === "high" && (
+            <span className="rounded bg-green-900 px-1.5 py-0.5 text-xs text-green-200" title="High pay band">
+              💰 high
+            </span>
+          )}
+          {j.region && j.region !== "unknown" && j.region !== "other" && (
+            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs uppercase text-neutral-300" title="Region">
+              {j.region}
+            </span>
+          )}
+          {j.isInternship && (
+            <span className="rounded bg-purple-900 px-1.5 py-0.5 text-xs text-purple-200" title="Internship">
+              intern
+            </span>
+          )}
           {j.aiFriendly != null && j.aiFriendly >= 60 && (
             <span
               className="rounded bg-sky-900 px-1.5 py-0.5 text-xs text-sky-200"
@@ -154,9 +169,31 @@ export function Feed({
   const [jobs, setJobs] = useState<JobRow[]>(initialJobs);
   const [followUpJobs, setFollowUpJobs] = useState<JobRow[]>(followUps);
   const [showSeen, setShowSeen] = useState(false);
+  const [region, setRegion] = useState<string>("");
+  const [highPayOnly, setHighPayOnly] = useState(false);
+  const [internOnly, setInternOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refreshResult, setRefreshResult] = useState<RefreshResult | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  function buildQuery(over: { showSeen?: boolean; region?: string; highPayOnly?: boolean; internOnly?: boolean } = {}) {
+    const seen = over.showSeen ?? showSeen;
+    const rg = over.region ?? region;
+    const hp = over.highPayOnly ?? highPayOnly;
+    const io = over.internOnly ?? internOnly;
+    const p = new URLSearchParams({ status: "to_apply", eligibility: "eligible,unknown" });
+    if (!seen) p.set("unseen", "true");
+    if (rg) p.set("region", rg);
+    if (hp) p.set("payTier", "high");
+    if (io) p.set("internship", "true");
+    return `/api/jobs?${p}`;
+  }
+
+  async function applyFilters(over: { showSeen?: boolean; region?: string; highPayOnly?: boolean; internOnly?: boolean } = {}) {
+    const r = await fetch(buildQuery(over));
+    const data = await r.json().catch(() => ({ jobs: [] }));
+    setJobs(data.jobs ?? []);
+  }
 
   async function handleRefresh() {
     setBusy(true);
@@ -174,13 +211,9 @@ export function Feed({
   }
 
   async function toggleShowSeen() {
-    const url = showSeen
-      ? "/api/jobs?status=to_apply&eligibility=eligible,unknown&unseen=true"
-      : "/api/jobs?status=to_apply&eligibility=eligible,unknown";
-    const r = await fetch(url);
-    const data = await r.json().catch(() => ({ jobs: [] }));
-    setJobs(data.jobs ?? []);
-    setShowSeen(!showSeen);
+    const next = !showSeen;
+    setShowSeen(next);
+    await applyFilters({ showSeen: next });
   }
 
   async function handleApply(j: JobRow) {
@@ -243,6 +276,39 @@ export function Feed({
           }`}
         >
           {showSeen ? "Hide seen" : "Show seen"}
+        </button>
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-neutral-500">Region:</span>
+        {[
+          { v: "", label: "All" },
+          { v: "us", label: "US" },
+          { v: "eu", label: "EU" },
+          { v: "au", label: "AU" },
+          { v: "worldwide", label: "WW" },
+        ].map((r) => (
+          <button
+            key={r.v || "all"}
+            onClick={() => { setRegion(r.v); applyFilters({ region: r.v }); }}
+            className={`rounded px-2 py-1 font-medium ${region === r.v ? "bg-indigo-700 text-indigo-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+          >
+            {r.label}
+          </button>
+        ))}
+        <span className="mx-1 text-neutral-700">|</span>
+        <button
+          onClick={() => { const n = !highPayOnly; setHighPayOnly(n); applyFilters({ highPayOnly: n }); }}
+          className={`rounded px-2 py-1 font-medium ${highPayOnly ? "bg-green-800 text-green-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+        >
+          💰 High-pay
+        </button>
+        <button
+          onClick={() => { const n = !internOnly; setInternOnly(n); applyFilters({ internOnly: n }); }}
+          className={`rounded px-2 py-1 font-medium ${internOnly ? "bg-purple-800 text-purple-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+        >
+          Internships
         </button>
       </div>
 

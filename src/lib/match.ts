@@ -25,13 +25,14 @@ export function parseJson<T>(raw: string): T {
 }
 
 function batchPrompt(profile: { resumeText: string; coreSkills: string; location?: string | null; timezone?: string | null; preferences?: string | null }, jobs: JobRow[]): string {
-  const list = jobs.map((j) => ({ id: j.id, title: j.title, company: j.company, description: j.description.slice(0, 1200) }));
+  const list = jobs.map((j) => ({ id: j.id, title: j.title, company: j.company, salary: j.salary, region: j.region, description: j.description.slice(0, 1200) }));
   return [
     "You are a job-matching assistant. Score how well each job fits the candidate.",
     `CANDIDATE RESUME:\n${profile.resumeText}`,
     `CORE SKILLS: ${profile.coreSkills}`,
     `CANDIDATE LOCATION: ${profile.location ?? "unknown"} (timezone ${profile.timezone ?? "unknown"})`,
     `CANDIDATE PREFERENCES: ${profile.preferences ?? "none stated"}`,
+    "RANKING PRIORITY: The candidate is based in India and wants high-paying REMOTE roles. Score HIGHER the roles that are remote, pay in USD/EUR/AUD (US/EU/AU/worldwide), and are open to candidates in India or worldwide. Score lower roles restricted to a region the candidate can't work from. Judge internships fairly on fit — do not penalize them for being internships.",
     `JOBS (JSON): ${JSON.stringify(list)}`,
     'Return ONLY a JSON array: [{"id": string, "score": number 0-100, "reason": string (max 15 words), "eligible": "yes"|"no"|"unclear" (can the candidate, living at the location above, legally/practically be hired for this job based on its text?), "eligibilityReason": string (max 12 words), "aiFriendly": number 0-100 (evidence the company embraces AI/modern tooling: AI products, LLM stack, AI-assisted dev culture)}]. One object per job id.',
   ].join("\n\n");

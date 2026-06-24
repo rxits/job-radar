@@ -9,6 +9,9 @@ export interface JobFilter {
   unseenOnly?: boolean;
   starred?: boolean;
   actioned?: boolean;
+  region?: string;
+  payTier?: string;
+  internship?: boolean;
 }
 
 export interface Db {
@@ -210,7 +213,11 @@ export function attachDb(raw: Database.Database): Db {
       if (f.unseenOnly) { where.push("j.seen_at IS NULL"); }
       if (f.starred) { where.push("j.starred = 1"); }
       if (f.actioned) { where.push("(j.status != 'to_apply' OR j.starred = 1)"); }
-      const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY m.score DESC NULLS LAST, m.ai_friendly DESC NULLS LAST, j.scraped_at DESC`;
+      if (f.region) { where.push("j.region = @region"); p.region = f.region; }
+      if (f.payTier) { where.push("j.pay_tier = @payTier"); p.payTier = f.payTier; }
+      if (f.internship !== undefined) { where.push("j.is_internship = @internship"); p.internship = f.internship ? 1 : 0; }
+      // high-pay roles float to the top, then by score / ai-friendliness / recency
+      const sql = `${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY (j.pay_tier = 'high') DESC, m.score DESC NULLS LAST, m.ai_friendly DESC NULLS LAST, j.scraped_at DESC`;
       return raw.prepare(sql).all(p).map(toRow);
     },
     unscoredJobs() {

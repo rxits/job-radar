@@ -20,6 +20,28 @@ describe("db", () => {
     expect(db.listJobs({}).length).toBe(2);
   });
 
+  it("classifies region/pay/internship on upsert and filters by them", () => {
+    db.upsertJobs([
+      job({ dedupeKey: "a", url: "https://x/a", title: "AI Engineer", location: "United States", salary: "$150k–$200k" }),
+      job({ dedupeKey: "b", url: "https://x/b", title: "ML Intern", location: "Berlin, Germany", salary: null }),
+    ]);
+    const us = db.listJobs({ region: "us" });
+    expect(us.length).toBe(1);
+    expect(us[0].payTier).toBe("high");
+    expect(db.listJobs({ region: "eu" }).length).toBe(1);
+    expect(db.listJobs({ payTier: "high" }).length).toBe(1);
+    expect(db.listJobs({ internship: true }).length).toBe(1);
+    expect(db.listJobs({ internship: true })[0].title).toBe("ML Intern");
+  });
+
+  it("floats high-pay jobs to the top of the list", () => {
+    db.upsertJobs([
+      job({ dedupeKey: "lo", url: "https://x/lo", salary: "$20/hr" }),
+      job({ dedupeKey: "hi", url: "https://x/hi", salary: "$180,000" }),
+    ]);
+    expect(db.listJobs({})[0].payTier).toBe("high");
+  });
+
   it("dedupes on dedupeKey", () => {
     db.upsertJobs([job()]);
     db.upsertJobs([job({ title: "Senior Engineer" })]); // same dedupeKey

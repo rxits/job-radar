@@ -126,6 +126,12 @@ export function Board({ initialJobs, sources }: { initialJobs: JobRow[]; sources
                       {j.eligibility === "unknown" && (
                         <span className="shrink-0 rounded bg-neutral-800 px-1 text-neutral-400" title="eligibility unknown">?</span>
                       )}
+                      {j.payTier === "high" && (
+                        <span className="shrink-0 rounded bg-green-900 px-1 text-green-200" title="High pay band">💰</span>
+                      )}
+                      {j.isInternship && (
+                        <span className="shrink-0 rounded bg-purple-900 px-1 text-purple-200" title="Internship">intern</span>
+                      )}
                       {j.aiFriendly != null && j.aiFriendly >= 60 && (
                         <span className="shrink-0 rounded bg-sky-900 px-1 text-sky-200" title="AI-friendly company signal">AI {j.aiFriendly}</span>
                       )}
