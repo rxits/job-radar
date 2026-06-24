@@ -11,6 +11,21 @@ function normalizeHimalayasDate(pubDate: unknown): string | null {
   return safeDateISO(pubDate as string);
 }
 
+// "Trase-systems" → "Trase Systems"
+function prettifySlug(slug: string): string {
+  return slug.split(/[-_]/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+// The bulk listing API redacts companyName to the literal placeholder "name";
+// fall back to the still-present companySlug in that case.
+function companyOf(r: any): string {
+  const name = String(r.companyName ?? "").trim();
+  if (name && name.toLowerCase() !== "name") return name;
+  const slug = String(r.companySlug ?? "").trim();
+  if (slug) return prettifySlug(slug);
+  return "Unknown";
+}
+
 export function parseHimalayas(rows: any[]): RawJob[] {
   return rows.map((r): RawJob => {
     const restrictions: string[] = Array.isArray(r.locationRestrictions) ? r.locationRestrictions : [];
@@ -19,7 +34,7 @@ export function parseHimalayas(rows: any[]): RawJob[] {
     const maxSalary = Number(r.maxSalary);
     const salary = minSalary > 0 && maxSalary > 0 ? `$${minSalary}–$${maxSalary}` : null;
     return {
-      company: String(r.companyName ?? "Unknown"),
+      company: companyOf(r),
       title: String(r.title ?? ""),
       location: geoRaw,
       remote: true,

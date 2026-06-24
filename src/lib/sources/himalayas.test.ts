@@ -19,6 +19,12 @@ describe("himalayas parser", () => {
     expect(j.remote).toBe(true);
   });
 
+  it("falls back to prettified companySlug when companyName is the redacted 'name' placeholder", () => {
+    const fakeJob = { ...data.jobs[0], companyName: "name", companySlug: "trase-systems" };
+    const jobs = parseHimalayas([fakeJob]);
+    expect(jobs[0].company).toBe("Trase Systems");
+  });
+
   it("uses applicationLink for url, falling back to guid", () => {
     const fakeJob = { ...data.jobs[0], applicationLink: "", guid: "https://himalayas.app/fallback" };
     const jobs = parseHimalayas([fakeJob]);
