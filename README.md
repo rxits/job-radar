@@ -1,10 +1,12 @@
 # job-radar
 
 Remote job boards are full of roles you cannot legally take. job-radar fixes that: it
-scrapes seven free sources, filters to the jobs you are actually eligible for based on
+scrapes nine free sources, filters to the jobs you are actually eligible for based on
 your location, scores every remaining role against your resume with Gemini, and — when
-you hit Apply — generates a tailored resume, cover letter, and outreach email ready to
-send. All data stays on your machine; only job text and your resume reach the Gemini API.
+you hit Apply — generates a tailored resume, cover letter, and outreach email (addressed
+to the founder/recruiter it finds) ready to send. It ranks high-paying remote roles in
+the US / EU / AU to the top and surfaces internships too. All data stays on your machine;
+only job text and your resume reach the Gemini API.
 
 Built with Claude Code. Runtime AI is Gemini only.
 
@@ -13,13 +15,24 @@ Built with Claude Code. Runtime AI is Gemini only.
 ## Features
 
 ### Sources & eligibility
-- Seven free boards: HN "Who is hiring?" (Algolia), RemoteOK, HN jobs (Firebase),
-  Remotive, Jobicy, Himalayas, WeWorkRemotely.
+- Nine free sources: HN "Who is hiring?" (Algolia), RemoteOK, HN jobs (Firebase),
+  Remotive, Jobicy, Himalayas, WeWorkRemotely, **LinkedIn** (public guest search, no
+  login), and a **thin X/Twitter** hiring-tweet scrape (best-effort, fails soft).
+- Every job is classified at scrape time: `region` (US / EU / AU / worldwide / other),
+  `pay_tier` (high / mid / low from salary), and `is_internship`.
 - Two-stage eligibility engine: structured geo fields checked with fast rules first;
   free-text descriptions judged by Gemini for anything ambiguous. Results: `eligible`,
   `ineligible`, or `unknown`.
-- Today feed defaults to `eligible + unknown`; ineligible jobs are still accessible via
-  filter.
+- Today feed defaults to `eligible + unknown`; filter by region, high-pay, or internships;
+  ineligible jobs are still accessible via filter.
+
+### Ranking, contacts & tailoring
+- High-pay roles float to the top; the matcher is told to rank remote roles paying in
+  USD/EUR/AUD and open to India/worldwide highest.
+- `pnpm import-resume` seeds your profile from a master `RESUME.md`.
+- After matching, kits are auto-generated for the top eligible matches, each with a
+  heuristic **contact lookup** (founder/recruiter + best-guess email) wired into the
+  outreach email. The contact panel also lives on each `/kit/[jobId]` page.
 
 ### AI matching
 - `gemini-2.5-flash` scores every eligible job 0–100 against your resume, writes a
@@ -67,8 +80,9 @@ The `/setup` wizard walks you through three steps:
 ## CLI commands
 
 ```bash
-pnpm scrape   # fetch from all sources, run eligibility rules, print per-source report
-pnpm match    # score unscored eligible/unknown jobs with Gemini; update eligibility
+pnpm import-resume [path]   # seed your profile from a master RESUME.md
+pnpm scrape   # fetch from all sources, classify + run eligibility rules, per-source report
+pnpm match    # score unscored eligible/unknown jobs with Gemini; auto-tailor top matches
 pnpm dev      # Next.js dev server at http://localhost:3000
 pnpm build    # production build
 pnpm test     # vitest unit suite (108 tests, no live network)
