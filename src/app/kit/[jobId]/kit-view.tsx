@@ -1,15 +1,37 @@
 "use client";
 import { useState } from "react";
-import type { JobRow, Kit } from "@/lib/types";
+import type { Contact, JobRow, Kit } from "@/lib/types";
 import { Markdown } from "@/lib/markdown";
 
 type Tab = "resume" | "cover" | "outreach";
 
-export function KitView({ job, kit: initialKit }: { job: JobRow; kit: Kit | null }) {
+export function KitView({ job, kit: initialKit, contact: initialContact }: { job: JobRow; kit: Kit | null; contact: Contact | null }) {
   const [kit, setKit] = useState<Kit | null>(initialKit);
   const [tab, setTab] = useState<Tab>("resume");
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [contact, setContact] = useState<Contact | null>(initialContact);
+  const [findingContact, setFindingContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  async function findContact() {
+    setFindingContact(true);
+    setContactError(null);
+    try {
+      const r = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "lookup failed");
+      setContact(data);
+    } catch (e) {
+      setContactError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFindingContact(false);
+    }
+  }
 
   async function generate() {
     setGenerating(true);
@@ -62,6 +84,68 @@ export function KitView({ job, kit: initialKit }: { job: JobRow; kit: Kit | null
           >
             View posting ↗
           </a>
+        </div>
+
+        {/* Contact panel */}
+        <div className="no-print rounded-lg border border-neutral-800 bg-neutral-900 p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-neutral-300">Who to contact</h2>
+            <button
+              onClick={findContact}
+              disabled={findingContact}
+              className="rounded bg-sky-800 px-3 py-1 text-xs font-medium hover:bg-sky-700 disabled:opacity-50"
+            >
+              {findingContact ? "Searching…" : contact ? "Re-find" : "Find contact"}
+            </button>
+          </div>
+          {contactError && <p className="text-xs text-red-400">{contactError}</p>}
+          {!contact && !contactError && (
+            <p className="text-xs text-neutral-500">No contact looked up yet — find the founder/recruiter and a best-guess email.</p>
+          )}
+          {contact && (
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-neutral-200">{contact.personName ?? "Unknown person"}</span>
+                {contact.personTitle && <span className="text-neutral-500">· {contact.personTitle}</span>}
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs ${
+                    contact.confidence === "found"
+                      ? "bg-emerald-900 text-emerald-200"
+                      : contact.confidence === "guessed"
+                        ? "bg-amber-900 text-amber-200"
+                        : "bg-neutral-800 text-neutral-400"
+                  }`}
+                  title="email confidence"
+                >
+                  {contact.confidence}
+                </span>
+              </div>
+              {contact.emails.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {contact.emails.map((e) => (
+                    <button
+                      key={e}
+                      onClick={() => copy(e)}
+                      className="rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-200 hover:bg-neutral-700"
+                      title="copy email"
+                    >
+                      {e} ⧉
+                    </button>
+                  ))}
+                </div>
+              )}
+              {contact.links.length > 0 && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {contact.links.map((l) => (
+                    <a key={l} href={l} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
+                      {l.replace(/^https?:\/\//, "").slice(0, 40)} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-neutral-600">source: {contact.source}</p>
+            </div>
+          )}
         </div>
 
         {!kit ? (

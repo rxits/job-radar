@@ -11,5 +11,6 @@ export default async function KitPage({ params }: { params: Promise<{ jobId: str
   const job = db().getJob(jobId);
   if (!job) notFound();
   const kit = db().getKit(jobId);
-  return <KitView job={job} kit={kit} />;
+  const contact = db().getContact(jobId);
+  return <KitView job={job} kit={kit} contact={contact} />;
 }
