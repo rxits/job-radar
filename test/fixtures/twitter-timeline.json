@@ -1,0 +1,66 @@
+{
+  "props": {
+    "pageProps": {
+      "timeline": {
+        "entries": [
+          {
+            "type": "tweet",
+            "content": {
+              "tweet": {
+                "full_text": "We're hiring a Senior Backend Engineer, fully remote (worldwide). Apply: https://t.co/abc123",
+                "created_at": "Mon Jun 16 12:00:00 +0000 2026",
+                "user": { "screen_name": "acmehq", "name": "Acme HQ" },
+                "entities": {
+                  "urls": [
+                    { "url": "https://t.co/abc123", "expanded_url": "https://acme.com/careers/backend" }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "type": "tweet",
+            "content": {
+              "tweet": {
+                "full_text": "Join our team! Open role: AI Engineer, remote-friendly. https://t.co/def456",
+                "created_at": "Sun Jun 15 09:30:00 +0000 2026",
+                "user": { "screen_name": "acmehq", "name": "Acme HQ" },
+                "entities": {
+                  "urls": [
+                    { "url": "https://t.co/def456", "expanded_url": "https://acme.com/jobs/ai" }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "type": "tweet",
+            "content": {
+              "tweet": {
+                "full_text": "Apply now: Product Designer (onsite, NYC). https://t.co/ghi789",
+                "created_at": "Sat Jun 14 18:00:00 +0000 2026",
+                "user": { "screen_name": "acmehq", "name": "Acme HQ" },
+                "entities": {
+                  "urls": [
+                    { "url": "https://t.co/ghi789", "expanded_url": "https://acme.com/jobs/designer" }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "type": "tweet",
+            "content": {
+              "tweet": {
+                "full_text": "Loved the conference today, great vibes and coffee.",
+                "created_at": "Fri Jun 13 20:00:00 +0000 2026",
+                "user": { "screen_name": "acmehq", "name": "Acme HQ" },
+                "entities": { "urls": [] }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
