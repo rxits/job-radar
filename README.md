@@ -83,9 +83,10 @@ The `/setup` wizard walks you through three steps:
 pnpm import-resume [path]   # seed your profile from a master RESUME.md
 pnpm scrape   # fetch from all sources, classify + run eligibility rules, per-source report
 pnpm match    # score unscored eligible/unknown jobs with Gemini; auto-tailor top matches
+pnpm digest [limit]   # daily briefing: top eligible matches + follow-ups → data/digests/<date>.md
 pnpm dev      # Next.js dev server at http://localhost:3000
 pnpm build    # production build
-pnpm test     # vitest unit suite (108 tests, no live network)
+pnpm test     # vitest unit suite (143 tests, no live network)
 pnpm exec tsc --noEmit   # typecheck
 ```
 
@@ -190,9 +191,10 @@ No other external services, no auth, no accounts.
 pnpm test
 ```
 
-108 tests covering:
+143 tests covering:
 
 - Per-source fixture parsers (no live network)
+- Daily-digest formatter (pure, deterministic render)
 - Eligibility rules engine
 - DB migration (fresh schema and v1→v2 upgrade path)
 - Scrape pipeline with injected source stubs

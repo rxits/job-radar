@@ -14,6 +14,7 @@
     "start": "next start",
     "scrape": "tsx scripts/scrape.ts",
     "match": "tsx scripts/match.ts",
+    "digest": "tsx scripts/digest.ts",
     "import-resume": "tsx scripts/import-resume.ts",
     "test": "vitest run"
   },

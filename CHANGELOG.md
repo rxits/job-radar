@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`pnpm digest [limit]`** — a daily terminal briefing of the top eligible, scored, to-apply matches (score, region/pay/AI-friendly tags, one-line reason, enriched contact, apply URL, kit-ready flag) plus a stale follow-up section. The render lives in `src/lib/digest.ts` and is pure (no DB/network/clock), so it is unit-tested deterministically; the script saves each run to `data/digests/<date>.md` (gitignored).
+
 ## v3 — 2026-06-24
 
 Wider sourcing, region/pay focus, contacts, and best-match auto-tailoring.
