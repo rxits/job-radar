@@ -1,18 +1,15 @@
-import Link from "next/link";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { Shell } from "@/components/ui/shell";
+
 export const metadata = { title: "job-radar" };
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen">
-        <nav className="flex gap-4 border-b border-neutral-800 px-6 py-3 text-sm">
-          <Link href="/" className="font-semibold">job-radar</Link>
-          <Link href="/" className="text-neutral-400 hover:text-neutral-100">Today</Link>
-          <Link href="/pipeline" className="text-neutral-400 hover:text-neutral-100">Pipeline</Link>
-          <Link href="/analytics" className="text-neutral-400 hover:text-neutral-100">Analytics</Link>
-          <Link href="/profile" className="text-neutral-400 hover:text-neutral-100">Profile</Link>
-        </nav>
-        <main className="p-6">{children}</main>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="min-h-screen font-sans">
+        <Shell>{children}</Shell>
       </body>
     </html>
   );
