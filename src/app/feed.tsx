@@ -1,7 +1,15 @@
 "use client";
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { ExternalLink, MapPin, Building2 } from "lucide-react";
 import type { JobRow } from "@/lib/types";
 import type { ScrapeReport } from "@/lib/scrape";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Meter } from "@/components/ui/meter";
+import { cn, regionLabel } from "@/lib/ui";
+import { staggerParent, staggerChild } from "@/lib/motion";
 
 interface RefreshResult {
   scrape?: ScrapeReport[];
@@ -14,31 +22,10 @@ function stripHtml(html: string): string {
 
 function EligBadge({ j }: { j: JobRow }) {
   if (j.eligibility === "eligible")
-    return (
-      <span
-        className="rounded bg-emerald-900 px-1.5 py-0.5 text-xs text-emerald-200"
-        title={j.eligibilityReason ?? "eligible"}
-      >
-        ✓
-      </span>
-    );
+    return <Badge variant="success" title={j.eligibilityReason ?? "eligible"}>eligible</Badge>;
   if (j.eligibility === "ineligible")
-    return (
-      <span
-        className="rounded bg-red-900 px-1.5 py-0.5 text-xs text-red-300"
-        title={j.eligibilityReason ?? "ineligible"}
-      >
-        ✗
-      </span>
-    );
-  return (
-    <span
-      className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-400"
-      title={j.eligibilityReason ?? "eligibility unknown"}
-    >
-      ?
-    </span>
-  );
+    return <Badge variant="danger" title={j.eligibilityReason ?? "ineligible"}>ineligible</Badge>;
+  return <Badge variant="muted" title={j.eligibilityReason ?? "eligibility unknown"}>unknown</Badge>;
 }
 
 function JobCard({
@@ -55,99 +42,63 @@ function JobCard({
   saved: boolean;
 }) {
   const excerpt = stripHtml(j.description ?? "");
+  const region = regionLabel(j.region);
+  const meta = [j.salary, j.location, j.source].filter(Boolean) as string[];
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 space-y-2">
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
+    <Card className="group p-4 hover:border-hairline-strong">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <a
             href={j.url}
             target="_blank"
             rel="noreferrer"
-            className="font-semibold text-base hover:underline"
+            className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-ink hover:text-accent"
           >
+            <Building2 size={14} className="text-ink-faint" />
             {j.company}
+            <ExternalLink size={12} className="opacity-0 transition-opacity group-hover:opacity-60" />
           </a>
-          <div className="text-neutral-300 text-sm">{j.title}</div>
+          <div className="truncate text-sm text-ink-dim">{j.title}</div>
         </div>
-        {/* Badges */}
-        <div className="flex shrink-0 flex-wrap items-center gap-1">
-          {j.score != null && (
-            <span className="rounded bg-indigo-900 px-1.5 py-0.5 text-xs text-indigo-200">
-              {j.score}
-            </span>
-          )}
-          <EligBadge j={j} />
-          {j.payTier === "high" && (
-            <span className="rounded bg-green-900 px-1.5 py-0.5 text-xs text-green-200" title="High pay band">
-              💰 high
-            </span>
-          )}
-          {j.region && j.region !== "unknown" && j.region !== "other" && (
-            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-xs uppercase text-neutral-300" title="Region">
-              {j.region}
-            </span>
-          )}
-          {j.isInternship && (
-            <span className="rounded bg-purple-900 px-1.5 py-0.5 text-xs text-purple-200" title="Internship">
-              intern
-            </span>
-          )}
-          {j.aiFriendly != null && j.aiFriendly >= 60 && (
-            <span
-              className="rounded bg-sky-900 px-1.5 py-0.5 text-xs text-sky-200"
-              title="AI-friendly company signal"
-            >
-              AI {j.aiFriendly}
-            </span>
-          )}
-        </div>
+        <div className="shrink-0">{j.score != null && <Meter score={j.score} />}</div>
       </div>
 
-      {/* Meta line */}
-      <div className="text-xs text-neutral-500">
-        {[j.salary, j.location, j.source].filter(Boolean).join(" · ")}
-      </div>
-
-      {/* Reason */}
-      {j.reason && (
-        <div className="text-xs italic text-neutral-400">{j.reason}</div>
-      )}
-
-      {/* Description excerpt */}
-      {excerpt && (
-        <p className="line-clamp-3 text-xs text-neutral-400">{excerpt}</p>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={onApply}
-          className="rounded bg-emerald-700 px-3 py-1 text-xs font-medium hover:bg-emerald-600"
-        >
-          Apply
-        </button>
-        <button
-          onClick={onSkip}
-          className="rounded bg-neutral-800 px-3 py-1 text-xs font-medium hover:bg-neutral-700"
-        >
-          Skip
-        </button>
-        {saved ? (
-          <span className="rounded border border-amber-700 px-3 py-1 text-xs text-amber-400">
-            Saved ✓
-          </span>
-        ) : (
-          <button
-            onClick={onSave}
-            className="rounded border border-amber-700 px-3 py-1 text-xs font-medium text-amber-400 hover:border-amber-500 hover:text-amber-300"
-          >
-            ☆ Save
-          </button>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <EligBadge j={j} />
+        {j.payTier === "high" && <Badge variant="accent" title="High pay band">high&nbsp;pay</Badge>}
+        {region && <Badge title="Region">{region}</Badge>}
+        {j.isInternship && <Badge title="Internship">intern</Badge>}
+        {j.aiFriendly != null && j.aiFriendly >= 60 && (
+          <Badge title="AI-friendly company signal">AI&nbsp;{j.aiFriendly}</Badge>
         )}
       </div>
-    </div>
+
+      {meta.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-ink-faint">
+          {meta.map((bit, i) => (
+            <span key={i} className="flex items-center gap-1.5">
+              {i === 1 && j.location && <MapPin size={10} />}
+              {bit}
+              {i < meta.length - 1 && <span className="text-hairline-strong">·</span>}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {j.reason && <p className="mt-2 text-xs italic text-ink-dim">{j.reason}</p>}
+      {excerpt && <p className="mt-1 line-clamp-2 text-xs text-ink-faint">{excerpt}</p>}
+
+      <div className="mt-3 flex items-center gap-2">
+        <Button variant="primary" onClick={onApply}>Apply</Button>
+        <Button variant="ghost" onClick={onSkip}>Skip</Button>
+        {saved ? (
+          <Badge variant="accent" className="px-2.5 py-1">Saved ✓</Badge>
+        ) : (
+          <Button variant="ghost" onClick={onSave}>☆ Save</Button>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -253,60 +204,57 @@ export function Feed({
     setFollowUpJobs((prev) => prev.filter((x) => x.id !== j.id));
   }
 
+  const regions = [
+    { v: "", label: "All" },
+    { v: "us", label: "US" },
+    { v: "eu", label: "EU" },
+    { v: "au", label: "AU" },
+    { v: "worldwide", label: "WW" },
+  ];
+
+  const toggleClass = (active: boolean) =>
+    cn(
+      "rounded-md px-2 py-1 text-xs font-medium transition-colors duration-150 ease-deck",
+      active ? "bg-accent-soft text-accent" : "bg-surface-raised text-ink-faint hover:text-ink-dim",
+    );
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold flex-1">
-          Today — {jobs.length} new match{jobs.length !== 1 ? "es" : ""}
+        <h1 className="flex-1 text-xl font-bold tracking-tight">
+          Today <span className="font-mono text-ink-faint">· {jobs.length} new</span>
         </h1>
-        <button
-          onClick={handleRefresh}
-          disabled={busy}
-          className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-        >
+        <Button variant="primary" size="md" onClick={handleRefresh} disabled={busy}>
           {busy ? "Scanning…" : "Refresh radar"}
-        </button>
-        <button
-          onClick={toggleShowSeen}
-          className={`rounded px-3 py-1.5 text-sm font-medium ${
-            showSeen
-              ? "bg-neutral-700 hover:bg-neutral-600"
-              : "bg-neutral-800 hover:bg-neutral-700"
-          }`}
-        >
+        </Button>
+        <Button variant="ghost" size="md" onClick={toggleShowSeen}>
           {showSeen ? "Hide seen" : "Show seen"}
-        </button>
+        </Button>
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-neutral-500">Region:</span>
-        {[
-          { v: "", label: "All" },
-          { v: "us", label: "US" },
-          { v: "eu", label: "EU" },
-          { v: "au", label: "AU" },
-          { v: "worldwide", label: "WW" },
-        ].map((r) => (
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-ink-faint">Region</span>
+        {regions.map((r) => (
           <button
             key={r.v || "all"}
             onClick={() => { setRegion(r.v); applyFilters({ region: r.v }); }}
-            className={`rounded px-2 py-1 font-medium ${region === r.v ? "bg-indigo-700 text-indigo-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+            className={toggleClass(region === r.v)}
           >
             {r.label}
           </button>
         ))}
-        <span className="mx-1 text-neutral-700">|</span>
+        <span className="mx-1 text-hairline-strong">|</span>
         <button
           onClick={() => { const n = !highPayOnly; setHighPayOnly(n); applyFilters({ highPayOnly: n }); }}
-          className={`rounded px-2 py-1 font-medium ${highPayOnly ? "bg-green-800 text-green-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+          className={toggleClass(highPayOnly)}
         >
-          💰 High-pay
+          High-pay
         </button>
         <button
           onClick={() => { const n = !internOnly; setInternOnly(n); applyFilters({ internOnly: n }); }}
-          className={`rounded px-2 py-1 font-medium ${internOnly ? "bg-purple-800 text-purple-100" : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"}`}
+          className={toggleClass(internOnly)}
         >
           Internships
         </button>
@@ -314,45 +262,34 @@ export function Feed({
 
       {/* Follow-up strip */}
       {followUpJobs.length > 0 && (
-        <div className="rounded-lg border border-amber-800 bg-amber-950/50 px-4 py-3 space-y-2">
-          <p className="text-sm font-medium text-amber-300">
+        <Card className="border-accent/30 bg-accent-soft px-4 py-3">
+          <p className="text-sm font-medium text-accent">
             Needs follow-up — applied 7+ days ago, no movement:
           </p>
-          <ul className="space-y-1">
+          <ul className="mt-2 space-y-1.5">
             {followUpJobs.map((j) => (
               <li key={j.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-neutral-300">
+                <span className="text-ink-dim">
                   {j.company} —{" "}
-                  <a
-                    href={j.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-amber-400 hover:underline"
-                  >
+                  <a href={j.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
                     {j.title}
                   </a>
                 </span>
-                <button
-                  onClick={() => handleFollowUpStatus(j, "interviewing")}
-                  className="rounded bg-emerald-900 px-2 py-0.5 text-xs text-emerald-300 hover:bg-emerald-800"
-                >
+                <Button variant="ghost" onClick={() => handleFollowUpStatus(j, "interviewing")}>
                   Mark interviewing
-                </button>
-                <button
-                  onClick={() => handleFollowUpStatus(j, "rejected")}
-                  className="rounded bg-red-900/50 px-2 py-0.5 text-xs text-red-400 hover:bg-red-900"
-                >
+                </Button>
+                <Button variant="danger" onClick={() => handleFollowUpStatus(j, "rejected")}>
                   Mark rejected
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
 
       {/* Refresh summary (shown briefly before reload) */}
       {refreshResult && (
-        <div className="rounded bg-neutral-800 px-4 py-2 text-xs text-neutral-400">
+        <div className="rounded-md border border-hairline bg-surface px-4 py-2 font-mono text-[11px] text-ink-faint">
           {Array.isArray(refreshResult.scrape) && (
             <span>
               {(refreshResult.scrape as ScrapeReport[]).map((r) => (
@@ -363,36 +300,36 @@ export function Feed({
             </span>
           )}
           {refreshResult.match && "scored" in refreshResult.match && (
-            <span className="ml-2">{refreshResult.match.scored} scored</span>
+            <span className="ml-2 text-emerald-300">{refreshResult.match.scored} scored</span>
           )}
           {refreshResult.match && "error" in refreshResult.match && (
-            <span className="ml-2 text-amber-400">{refreshResult.match.error}</span>
+            <span className="ml-2 text-accent">{refreshResult.match.error}</span>
           )}
         </div>
       )}
 
       {/* Job cards */}
       {jobs.length === 0 ? (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-8 text-center text-neutral-400">
+        <Card className="p-10 text-center text-ink-dim">
           <p className="text-base">No new matches.</p>
-          <p className="mt-1 text-sm">
-            Hit <span className="text-emerald-400">Refresh radar</span>, or lower your filters in
-            Pipeline.
+          <p className="mt-1 text-sm text-ink-faint">
+            Hit <span className="text-accent">Refresh radar</span>, or lower your filters in Pipeline.
           </p>
-        </div>
+        </Card>
       ) : (
-        <div className="space-y-3">
+        <motion.div className="space-y-3" variants={staggerParent} initial="hidden" animate="show">
           {jobs.map((j) => (
-            <JobCard
-              key={j.id}
-              j={j}
-              onApply={() => handleApply(j)}
-              onSkip={() => handleSkip(j)}
-              onSave={() => handleSave(j)}
-              saved={savedIds.has(j.id)}
-            />
+            <motion.div key={j.id} variants={staggerChild}>
+              <JobCard
+                j={j}
+                onApply={() => handleApply(j)}
+                onSkip={() => handleSkip(j)}
+                onSave={() => handleSave(j)}
+                saved={savedIds.has(j.id)}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );
