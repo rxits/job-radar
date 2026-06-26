@@ -16,10 +16,15 @@
     "match": "tsx scripts/match.ts",
     "digest": "tsx scripts/digest.ts",
     "import-resume": "tsx scripts/import-resume.ts",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset",
+    "db:start": "supabase start",
     "test": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.108.2",
     "better-sqlite3": "^11.8.0",
     "framer-motion": "^12.42.0",
     "geist": "^1.7.2",

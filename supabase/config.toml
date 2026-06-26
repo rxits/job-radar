@@ -1,0 +1,6 @@
+# Minimal Supabase CLI config. `supabase link --project-ref <ref>` will populate
+# the remote link; this project_id is just the local label.
+project_id = "job-radar"
+
+[db]
+major_version = 15

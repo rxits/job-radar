@@ -5,6 +5,9 @@ profile.md
 *.db
 *.db-*
 .env*
+!.env.local.example
+supabase/.branches
+supabase/.temp
 *.log
 .DS_Store
 *.tsbuildinfo
