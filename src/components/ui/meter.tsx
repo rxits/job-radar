@@ -9,7 +9,7 @@ export function Meter({ score }: { score: number | null }) {
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-hairline">
         <div className={cn("h-full rounded-full transition-all duration-300 ease-deck", meta.barClass)} style={{ width: `${pct}%` }} />
       </div>
-      <span className={cn("font-mono text-xs tabular-nums", meta.textClass)}>
+      <span className={cn("text-xs font-semibold tabular-nums", meta.textClass)}>
         {score ?? "—"}
       </span>
     </div>

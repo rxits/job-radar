@@ -75,7 +75,7 @@ function JobCard({
       </div>
 
       {meta.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-[11px] text-ink-faint">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
           {meta.map((bit, i) => (
             <span key={i} className="flex items-center gap-1.5">
               {i === 1 && j.location && <MapPin size={10} />}
@@ -223,7 +223,7 @@ export function Feed({
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="flex-1 text-xl font-bold tracking-tight">
-          Today <span className="font-mono text-ink-faint">· {jobs.length} new</span>
+          Today <span className="font-normal text-ink-faint">· {jobs.length} new {jobs.length === 1 ? "match" : "matches"}</span>
         </h1>
         <Button variant="primary" size="md" onClick={handleRefresh} disabled={busy}>
           {busy ? "Scanning…" : "Refresh radar"}
@@ -289,7 +289,7 @@ export function Feed({
 
       {/* Refresh summary (shown briefly before reload) */}
       {refreshResult && (
-        <div className="rounded-md border border-hairline bg-surface px-4 py-2 font-mono text-[11px] text-ink-faint">
+        <div className="rounded-xl border border-hairline bg-surface px-4 py-2 text-xs text-ink-faint">
           {Array.isArray(refreshResult.scrape) && (
             <span>
               {(refreshResult.scrape as ScrapeReport[]).map((r) => (

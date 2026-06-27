@@ -13,10 +13,10 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
-  const notWired = () => setMsg("Auth wiring lands in S0 · Task 3 (Supabase) — preview only.");
+  const notWired = () => setMsg("Sign-in comes online shortly — this is an early preview.");
 
   return (
-    <div className="relative -mx-5 -my-7 min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[380px] bg-[radial-gradient(55%_55%_at_50%_0%,var(--accent-soft),transparent_70%)]" />
       <div className="relative z-10 mx-auto flex max-w-sm flex-col items-center px-5 pt-24">
         <Link href="/landing" className="mb-6 flex items-center gap-2 font-semibold tracking-tight">

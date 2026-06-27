@@ -14,10 +14,10 @@ export function scoreTier(score: number | null): Tier {
 
 export function tierMeta(tier: Tier): { label: string; barClass: string; textClass: string } {
   switch (tier) {
-    case "elite": return { label: "Elite match", barClass: "bg-accent", textClass: "text-accent" };
-    case "high":  return { label: "Strong match", barClass: "bg-emerald-400", textClass: "text-emerald-300" };
-    case "mid":   return { label: "Fair match", barClass: "bg-ink-dim", textClass: "text-ink-dim" };
-    case "low":   return { label: "Weak match", barClass: "bg-ink-faint", textClass: "text-ink-faint" };
+    case "elite": return { label: "Great match", barClass: "bg-accent", textClass: "text-accent" };
+    case "high":  return { label: "Strong match", barClass: "bg-positive", textClass: "text-positive" };
+    case "mid":   return { label: "Fair match", barClass: "bg-ink-faint", textClass: "text-ink-dim" };
+    case "low":   return { label: "Worth a look", barClass: "bg-ink-faint", textClass: "text-ink-faint" };
   }
 }
 
